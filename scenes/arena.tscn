@@ -1,0 +1,293 @@
+[gd_scene load_steps=6 format=3 uid="uid://barena001tag"]
+
+[ext_resource type="Script" path="res://scripts/game/arena.gd" id="1_arena"]
+[ext_resource type="Script" path="res://scripts/world/spawn_manager.gd" id="2_spawn"]
+[ext_resource type="Script" path="res://network/network_player_spawner.gd" id="3_nsp"]
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="4_hud"]
+
+[sub_resource type="RectangleShape2D" id="RectWallH"]
+size = Vector2(1240, 40)
+
+[sub_resource type="RectangleShape2D" id="RectWallV"]
+size = Vector2(40, 840)
+
+[sub_resource type="RectangleShape2D" id="RectPillar"]
+size = Vector2(80, 80)
+
+[node name="Arena" type="Node2D"]
+script = ExtResource("1_arena")
+
+[node name="Floor" type="Polygon2D" parent="."]
+z_index = -2
+color = Color(0.16, 0.2, 0.26, 1)
+polygon = PackedVector2Array(0, 0, 1200, 0, 1200, 800, 0, 800)
+
+[node name="FloorAccent" type="Polygon2D" parent="."]
+z_index = -1
+color = Color(0.2, 0.26, 0.34, 1)
+polygon = PackedVector2Array(80, 80, 1120, 80, 1120, 720, 80, 720)
+
+[node name="CenterMark" type="Polygon2D" parent="."]
+z_index = -1
+color = Color(0.25, 0.32, 0.4, 1)
+polygon = PackedVector2Array(560, 360, 640, 360, 640, 440, 560, 440)
+
+[node name="Walls" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Top" type="CollisionShape2D" parent="Walls"]
+position = Vector2(600, -20)
+shape = SubResource("RectWallH")
+
+[node name="TopVisual" type="Polygon2D" parent="Walls"]
+color = Color(0.45, 0.48, 0.55, 1)
+polygon = PackedVector2Array(-20, -40, 1220, -40, 1220, 0, -20, 0)
+
+[node name="Bottom" type="CollisionShape2D" parent="Walls"]
+position = Vector2(600, 820)
+shape = SubResource("RectWallH")
+
+[node name="BottomVisual" type="Polygon2D" parent="Walls"]
+color = Color(0.45, 0.48, 0.55, 1)
+polygon = PackedVector2Array(-20, 800, 1220, 800, 1220, 840, -20, 840)
+
+[node name="Left" type="CollisionShape2D" parent="Walls"]
+position = Vector2(-20, 400)
+shape = SubResource("RectWallV")
+
+[node name="LeftVisual" type="Polygon2D" parent="Walls"]
+color = Color(0.45, 0.48, 0.55, 1)
+polygon = PackedVector2Array(-40, -20, 0, -20, 0, 820, -40, 820)
+
+[node name="Right" type="CollisionShape2D" parent="Walls"]
+position = Vector2(1220, 400)
+shape = SubResource("RectWallV")
+
+[node name="RightVisual" type="Polygon2D" parent="Walls"]
+color = Color(0.45, 0.48, 0.55, 1)
+polygon = PackedVector2Array(1200, -20, 1240, -20, 1240, 820, 1200, 820)
+
+[node name="PillarNW" type="CollisionShape2D" parent="Walls"]
+position = Vector2(300, 250)
+shape = SubResource("RectPillar")
+
+[node name="PillarNWVisual" type="Polygon2D" parent="Walls"]
+color = Color(0.38, 0.42, 0.5, 1)
+position = Vector2(300, 250)
+polygon = PackedVector2Array(-40, -40, 40, -40, 40, 40, -40, 40)
+
+[node name="PillarNE" type="CollisionShape2D" parent="Walls"]
+position = Vector2(900, 250)
+shape = SubResource("RectPillar")
+
+[node name="PillarNEVisual" type="Polygon2D" parent="Walls"]
+color = Color(0.38, 0.42, 0.5, 1)
+position = Vector2(900, 250)
+polygon = PackedVector2Array(-40, -40, 40, -40, 40, 40, -40, 40)
+
+[node name="PillarSW" type="CollisionShape2D" parent="Walls"]
+position = Vector2(300, 550)
+shape = SubResource("RectPillar")
+
+[node name="PillarSWVisual" type="Polygon2D" parent="Walls"]
+color = Color(0.38, 0.42, 0.5, 1)
+position = Vector2(300, 550)
+polygon = PackedVector2Array(-40, -40, 40, -40, 40, 40, -40, 40)
+
+[node name="PillarSE" type="CollisionShape2D" parent="Walls"]
+position = Vector2(900, 550)
+shape = SubResource("RectPillar")
+
+[node name="PillarSEVisual" type="Polygon2D" parent="Walls"]
+color = Color(0.38, 0.42, 0.5, 1)
+position = Vector2(900, 550)
+polygon = PackedVector2Array(-40, -40, 40, -40, 40, 40, -40, 40)
+
+[node name="PlayerSpawns" type="Node2D" parent="."]
+
+[node name="Spawn1" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(150, 150)
+
+[node name="Spawn2" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(1050, 150)
+
+[node name="Spawn3" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(150, 650)
+
+[node name="Spawn4" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(1050, 650)
+
+[node name="RespawnPoints" type="Node2D" parent="."]
+
+[node name="Respawn1" type="Marker2D" parent="RespawnPoints"]
+position = Vector2(200, 400)
+
+[node name="Respawn2" type="Marker2D" parent="RespawnPoints"]
+position = Vector2(1000, 400)
+
+[node name="Respawn3" type="Marker2D" parent="RespawnPoints"]
+position = Vector2(600, 150)
+
+[node name="Respawn4" type="Marker2D" parent="RespawnPoints"]
+position = Vector2(600, 650)
+
+[node name="PickupSpawns" type="Node2D" parent="."]
+
+[node name="P1" type="Marker2D" parent="PickupSpawns"]
+position = Vector2(450, 200)
+
+[node name="P2" type="Marker2D" parent="PickupSpawns"]
+position = Vector2(750, 200)
+
+[node name="P3" type="Marker2D" parent="PickupSpawns"]
+position = Vector2(450, 600)
+
+[node name="P4" type="Marker2D" parent="PickupSpawns"]
+position = Vector2(750, 600)
+
+[node name="P5" type="Marker2D" parent="PickupSpawns"]
+position = Vector2(600, 300)
+
+[node name="P6" type="Marker2D" parent="PickupSpawns"]
+position = Vector2(600, 500)
+
+[node name="Players" type="Node2D" parent="."]
+
+[node name="Pickups" type="Node2D" parent="."]
+
+[node name="SpawnManager" type="Node" parent="."]
+script = ExtResource("2_spawn")
+player_spawns_path = NodePath("../PlayerSpawns")
+respawn_points_path = NodePath("../RespawnPoints")
+pickup_spawns_path = NodePath("../PickupSpawns")
+
+[node name="NetworkPlayerSpawner" type="Node" parent="."]
+script = ExtResource("3_nsp")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("4_hud")
+
+[node name="Root" type="Control" parent="HUD"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TopLeft" type="VBoxContainer" parent="HUD/Root"]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 320.0
+offset_bottom = 160.0
+
+[node name="HealthLabel" type="Label" parent="HUD/Root/TopLeft"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "HP 100 / 100"
+
+[node name="HealthBar" type="ProgressBar" parent="HUD/Root/TopLeft"]
+custom_minimum_size = Vector2(240, 18)
+layout_mode = 2
+value = 100.0
+show_percentage = false
+
+[node name="InventoryLabel" type="Label" parent="HUD/Root/TopLeft"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Inv  1:Empty | 2:Empty | 3:Empty"
+
+[node name="PowerLabel" type="Label" parent="HUD/Root/TopLeft"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Power: —"
+
+[node name="TopRight" type="VBoxContainer" parent="HUD/Root"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -280.0
+offset_top = 12.0
+offset_right = -16.0
+offset_bottom = 200.0
+grow_horizontal = 0
+
+[node name="TimerLabel" type="Label" parent="HUD/Root/TopRight"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Time 120"
+horizontal_alignment = 2
+
+[node name="ItLabel" type="Label" parent="HUD/Root/TopRight"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Not It"
+horizontal_alignment = 2
+
+[node name="ScoreLabel" type="Label" parent="HUD/Root/TopRight"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Scores"
+horizontal_alignment = 2
+
+[node name="NetStatus" type="Label" parent="HUD/Root/TopRight"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.75, 0.85, 1)
+theme_override_font_sizes/font_size = 12
+text = "Net: Offline"
+horizontal_alignment = 2
+
+[node name="Help" type="Label" parent="HUD/Root"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -300.0
+offset_top = -36.0
+offset_right = 300.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.65, 0.7, 0.78, 1)
+theme_override_font_sizes/font_size = 12
+text = "WASD move · Shift sprint · 1/2/3 use item · Touch others while IT to tag"
+horizontal_alignment = 1
+
+[node name="MatchOver" type="PanelContainer" parent="HUD/Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -180.0
+offset_top = -100.0
+offset_right = 180.0
+offset_bottom = 100.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="HUD/Root/MatchOver"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ResultLabel" type="Label" parent="HUD/Root/MatchOver/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Match Over!"
+horizontal_alignment = 1
+
+[node name="RestartButton" type="Button" parent="HUD/Root/MatchOver/VBox"]
+layout_mode = 2
+text = "Restart Match"
+
+[node name="MenuButton" type="Button" parent="HUD/Root/MatchOver/VBox"]
+layout_mode = 2
+text = "Back to Menu"

@@ -1,0 +1,26 @@
+# Godot 4
+.godot/
+*.translation
+export.cfg
+export_presets.cfg
+
+# Imported assets cache (Godot regenerates these)
+*.import
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+
+# Local Godot binary used for validation (do not commit)
+tools/
+*.exe
+*.zip
+
+# Test / smoke output
+tests/.cache/
+tests/output/
+*.log
