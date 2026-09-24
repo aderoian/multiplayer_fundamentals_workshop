@@ -1,5 +1,5 @@
-extends Node
-## MatchManager — MATCH STATE (timer, scores, started, current It).
+﻿extends Node
+## MatchManager ΓÇö MATCH STATE (timer, scores, started, current It).
 ##
 ## Distinct from:
 ## - Player state: position, health, inventory, is_it
@@ -49,7 +49,7 @@ func _process(delta: float) -> void:
 
 
 func _should_tick_timer_locally() -> bool:
-	# Offline: no peer → tick locally. Online: ONLY the server ticks.
+	# Offline: no peer ΓåÆ tick locally. Online: ONLY the server ticks.
 	if multiplayer.multiplayer_peer == null:
 		return true
 	return multiplayer.is_server()
@@ -242,7 +242,7 @@ func apply_snapshot(data: Dictionary) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func rpc_late_join_snapshot(match_data: Dictionary, players_data: Array, pickups_data: Array) -> void:
-	## Synchronizing *changes* is not enough — late joiners need a full snapshot.
+	## Synchronizing *changes* is not enough ΓÇö late joiners need a full snapshot.
 	apply_snapshot(match_data)
 	# Rebuild world pickups from server list.
 	var arena := get_tree().get_first_node_in_group("arena")
