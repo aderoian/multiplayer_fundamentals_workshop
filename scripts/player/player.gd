@@ -289,9 +289,7 @@ func _server_validate_tag(tagger_id: int, target_id: int) -> bool:
 
 
 func _server_apply_tag(tagger_id: int, target_id: int) -> void:
-	Match.add_score(tagger_id, 1)
-	# WORKSHOP TODO (08): scores are match state — replicate player_scores to all peers.
-	# Tag RESULT (who is It) replicates via Match.rpc_apply_tag_result; host scoreboard is authoritative until 08.
+	Match.add_score(tagger_id, 1) # replicates scores to all peers (08)
 	Match.rpc_apply_tag_result.rpc(tagger_id, target_id)
 
 
