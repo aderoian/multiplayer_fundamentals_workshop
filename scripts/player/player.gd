@@ -70,6 +70,9 @@ func _apply_setup() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Top-down: never rotate the body to face movement.
+	rotation = 0.0
+
 	if _respawn_timer >= 0.0:
 		_respawn_timer -= delta
 		if _respawn_timer <= 0.0:
@@ -102,9 +105,6 @@ func _physics_process(delta: float) -> void:
 	velocity = dir * speed
 	move_and_slide()
 
-	if dir.length_squared() > 0.0:
-		rotation = dir.angle()
-
 	_broadcast_transform()
 
 	# Position sync: authority sends transform (unreliable). MultiplayerSynchronizer also
@@ -116,30 +116,32 @@ func _broadcast_transform() -> void:
 		return
 	if not is_multiplayer_authority():
 		return
-	rpc_set_transform.rpc(global_position, rotation)
+	rotation = 0.0
+	rpc_set_transform.rpc(global_position, 0.0)
 
 
 @rpc("any_peer", "unreliable_ordered", "call_remote")
-func rpc_set_transform(pos: Vector2, rot: float) -> void:
-	## Apply authority transform on remotes (also covers ensure-spawned players).
+func rpc_set_transform(pos: Vector2, _rot: float) -> void:
+	## Apply authority position on remotes. Rotation stays fixed (top-down).
 	if is_multiplayer_authority():
 		return
 	global_position = pos
-	rotation = rot
+	rotation = 0.0
 
 
 func force_set_transform(pos: Vector2) -> void:
 	## Test / teleport helper for the authority (or server placing bodies).
 	global_position = pos
 	position = pos
+	rotation = 0.0
 	if multiplayer.multiplayer_peer != null and is_multiplayer_authority():
-		rpc_set_transform.rpc(pos, rotation)
+		rpc_set_transform.rpc(pos, 0.0)
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not _should_process_input():
 		return
-	if not health.is_alive:
+	if not _can_use_items():
 		return
 	if event.is_action_pressed("use_slot_1"):
 		_try_use_item(0)
@@ -147,6 +149,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_use_item(1)
 	elif event.is_action_pressed("use_slot_3"):
 		_try_use_item(2)
+
+
+func _can_use_items() -> bool:
+	## Dead or waiting to respawn cannot use inventory. Cleared on respawn.
+	if _respawn_timer >= 0.0:
+		return false
+	if health == null or not health.is_alive:
+		return false
+	return true
 
 
 func _should_process_input() -> bool:
@@ -158,6 +169,8 @@ func _should_process_input() -> bool:
 
 
 func _try_use_item(slot_index: int) -> void:
+	if not _can_use_items():
+		return
 	if multiplayer.multiplayer_peer == null:
 		inventory.use_slot(slot_index, health)
 		return
@@ -235,6 +248,8 @@ func request_use_item(slot_index: int) -> void:
 
 func _server_use_item(sender: int, slot_index: int) -> void:
 	if sender != peer_id:
+		return
+	if not health.is_alive:
 		return
 	if not inventory.use_slot(slot_index, health):
 		return
@@ -373,12 +388,16 @@ func _sync_health_to_peers() -> void:
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_sync_health(p_health: int, p_alive: bool, p_shield: bool, p_pos: Vector2) -> void:
 	## Server → clients: display server health; clients never invent HP.
+	if p_alive:
+		_respawn_timer = -1.0
 	health.apply_replica(p_health, p_alive, p_shield)
 	global_position = p_pos
+	rotation = 0.0
 	if not p_alive:
 		modulate = Color(1, 1, 1, 0.35)
 	else:
 		modulate = Color(1, 1, 1, 1)
+	_update_visuals()
 
 
 func collect_pickup_offline(pickup: Node) -> bool:
@@ -417,7 +436,9 @@ func _on_died() -> void:
 
 
 func _on_respawned() -> void:
+	_respawn_timer = -1.0
 	modulate = Color(1, 1, 1, 1)
+	rotation = 0.0
 	_update_visuals()
 
 
@@ -425,20 +446,55 @@ func _do_respawn() -> void:
 	## Server / offline respawn; then replicate.
 	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
 		return
-	var points := get_tree().get_nodes_in_group("respawn_points")
-	if points.size() > 0:
-		var idx: int = abs(peer_id) % points.size()
-		global_position = (points[idx] as Node2D).global_position
-	health.mark_respawned()
+	_apply_respawn_state(_pick_respawn_position())
 	_sync_health_to_peers()
 	rpc_notify_respawn.rpc(global_position)
 
 
+func _pick_respawn_position() -> Vector2:
+	var points := get_tree().get_nodes_in_group("respawn_points")
+	if points.size() > 0:
+		var idx: int = abs(peer_id) % points.size()
+		return (points[idx] as Node2D).global_position
+	return global_position
+
+
+func _apply_respawn_state(p_pos: Vector2) -> void:
+	## Clears death gates so movement, pickup, and item use work again.
+	_respawn_timer = -1.0
+	global_position = p_pos
+	rotation = 0.0
+	modulate = Color(1, 1, 1, 1)
+	health.mark_respawned()
+	_update_visuals()
+
+
 @rpc("any_peer", "call_remote", "reliable")
 func rpc_notify_respawn(p_pos: Vector2) -> void:
+	_respawn_timer = -1.0
 	global_position = p_pos
-	health.apply_replica(health.max_health, true, false)
+	rotation = 0.0
 	modulate = Color(1, 1, 1, 1)
+	health.apply_replica(health.max_health, true, false)
+	_update_visuals()
+
+
+func reset_for_new_match(as_it: bool, spawn_pos: Vector2) -> void:
+	## In-place match restart — keep the node, reset gameplay state.
+	_respawn_timer = -1.0
+	velocity = Vector2.ZERO
+	# Cooldown before moving/setting It so spawn overlaps cannot instantly tag.
+	tag_comp.begin_cooldown_sec(2.0)
+	global_position = spawn_pos
+	rotation = 0.0
+	modulate = Color(1, 1, 1, 1)
+	health.reset_full()
+	inventory.clear_all()
+	tag_comp.set_it(as_it)
+	_update_visuals()
+	health.health_changed.emit(health.health, health.max_health)
+	inventory.inventory_changed.emit(inventory.slots.duplicate())
+	inventory.speed_boost_changed.emit(false, 0.0)
 
 
 func _on_tag_changed(_is_it: bool) -> void:
@@ -494,11 +550,12 @@ func build_state_snapshot() -> Dictionary:
 func apply_state_snapshot(data: Dictionary) -> void:
 	## Late join: apply a full copy of this player's current state.
 	global_position = data.get("pos", global_position)
-	rotation = float(data.get("rot", rotation))
+	rotation = 0.0
 	display_name = str(data.get("name", display_name))
 	if name_label:
 		name_label.text = display_name
 	tag_comp.set_it(bool(data.get("is_it", false)))
+	_respawn_timer = -1.0
 	health.apply_replica(int(data.get("health", 100)), bool(data.get("alive", true)), bool(data.get("shield", false)))
 	var slots: Array = data.get("slots", [])
 	for i in range(mini(slots.size(), InventoryComponent.MAX_SLOTS)):

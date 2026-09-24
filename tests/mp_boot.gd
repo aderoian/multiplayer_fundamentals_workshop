@@ -128,9 +128,13 @@ func _wait_for_peers(count: int, timeout: float) -> void:
 func _run_host_scenarios() -> void:
 	await _scenario_movement()
 	await _scenario_tag()
+	await _scenario_hud_state()
 	await _scenario_health_death_respawn()
+	await _scenario_use_after_respawn()
+	await _scenario_rotation_stays_zero()
 	await _scenario_inventory_and_contest()
 	await _scenario_scores_timer()
+	await _scenario_restart_match()
 	if expected_clients >= 2 or run_late_join:
 		await _scenario_late_join_and_it_disconnect()
 	else:
@@ -260,6 +264,211 @@ func _scenario_health_death_respawn() -> void:
 		_pass("health_respawn", "respawned full hp")
 	else:
 		_fail("health_respawn", detail)
+
+
+func _scenario_hud_state() -> void:
+	## After tag, client snapshots must reflect health / is_it / alive for HUD-relevant props.
+	await _collect_snapshots()
+	var clients: PackedInt32Array = multiplayer.get_peers()
+	if clients.is_empty():
+		_fail("hud_state", "no clients")
+		return
+	var target_id: int = clients[0]
+	var ok := true
+	var detail := ""
+	for peer_id in relay.reports.keys():
+		var snap: Dictionary = relay.reports[peer_id].get("snapshot", {})
+		var local: Dictionary = snap.get("local", {})
+		# Every peer's player list must show consistent It / health for the tagged target.
+		for pl in snap.get("players", []):
+			if int(pl.get("peer_id")) == target_id:
+				if not bool(pl.get("is_it")):
+					ok = false
+					detail += " peer%s target not It;" % str(peer_id)
+				if int(pl.get("health", 100)) >= 100:
+					ok = false
+					detail += " peer%s target hp not damaged;" % str(peer_id)
+				if not bool(pl.get("alive", true)):
+					ok = false
+					detail += " peer%s target unexpectedly dead;" % str(peer_id)
+		# Local HUD props on the tagged client must match.
+		if int(peer_id) == target_id:
+			if not bool(local.get("is_it")):
+				ok = false
+				detail += " client local is_it false;"
+			if int(local.get("health", 100)) >= 100:
+				ok = false
+				detail += " client local health not damaged;"
+			if not bool(local.get("alive", false)):
+				ok = false
+				detail += " client local not alive;"
+	if ok:
+		_pass("hud_state", "clients see health/is_it/alive after tag")
+	else:
+		_fail("hud_state", detail)
+
+
+func _scenario_use_after_respawn() -> void:
+	## After death+respawn, the target must be able to use an inventory item again.
+	var clients: PackedInt32Array = multiplayer.get_peers()
+	if clients.is_empty():
+		_fail("use_after_respawn", "no clients")
+		return
+	var target_id: int = clients[0]
+	var p := _player(target_id)
+	if p == null:
+		_fail("use_after_respawn", "missing target")
+		return
+	# Ensure alive after prior death scenario.
+	var h: HealthComponent = p.get_node("Health") as HealthComponent
+	if not h.is_alive:
+		p.call("_do_respawn")
+		await get_tree().create_timer(0.5).timeout
+	# Grant a speed boost (usable while alive) on server and sync.
+	relay.rpc_server_grant_item(target_id, 2) # SPEED_BOOST
+	await get_tree().create_timer(0.3).timeout
+	await _collect_snapshots()
+	var had_item := false
+	for peer_id in relay.reports.keys():
+		var snap: Dictionary = relay.reports[peer_id].get("snapshot", {})
+		for pl in snap.get("players", []):
+			if int(pl.get("peer_id")) == target_id:
+				for s in pl.get("slots", []):
+					if int(s) == 2:
+						had_item = true
+	if not had_item:
+		_fail("use_after_respawn", "grant failed; no speed item on target")
+		return
+	# Client uses via the same path as key 1/2/3.
+	relay.rpc_cmd.rpc_id(target_id, "use_slot", {"slot": 0})
+	await get_tree().create_timer(0.6).timeout
+	await _collect_snapshots()
+	var used := true
+	var can_use := true
+	var detail := ""
+	for peer_id in relay.reports.keys():
+		var snap: Dictionary = relay.reports[peer_id].get("snapshot", {})
+		for pl in snap.get("players", []):
+			if int(pl.get("peer_id")) == target_id:
+				for s in pl.get("slots", []):
+					if int(s) == 2:
+						used = false
+						detail += " peer%s still has speed;" % str(peer_id)
+				if not bool(pl.get("alive")):
+					used = false
+					detail += " peer%s not alive;" % str(peer_id)
+		if int(peer_id) == target_id:
+			var local: Dictionary = snap.get("local", {})
+			if not bool(local.get("can_use", false)):
+				can_use = false
+				detail += " client can_use false;"
+			if not bool(local.get("alive", false)):
+				can_use = false
+				detail += " client local not alive;"
+	if used and can_use:
+		_pass("use_after_respawn", "item used after respawn")
+	else:
+		_fail("use_after_respawn", detail)
+
+
+func _scenario_rotation_stays_zero() -> void:
+	var host_p := _player(1)
+	if host_p == null:
+		_fail("rotation", "missing host")
+		return
+	# Move through several directions on host + client.
+	var dirs: Array[Vector2] = [
+		Vector2(1, 0), Vector2(0, 1), Vector2(-1, 0), Vector2(0, -1), Vector2(1, 1).normalized()
+	]
+	var base: Vector2 = host_p.global_position
+	for d in dirs:
+		host_p.global_position = base + d * 40.0
+		host_p.rotation = 0.0
+		if host_p.has_method("_broadcast_transform"):
+			host_p.call("_broadcast_transform")
+		await get_tree().create_timer(0.05).timeout
+	relay.rpc_cmd.rpc("walk_dirs", {})
+	await get_tree().create_timer(0.4).timeout
+	await _collect_snapshots()
+	var ok := true
+	var detail := ""
+	for peer_id in relay.reports.keys():
+		var snap: Dictionary = relay.reports[peer_id].get("snapshot", {})
+		for pl in snap.get("players", []):
+			if abs(float(pl.get("rot", 0.0))) > 0.001:
+				ok = false
+				detail += " peer%s player%d rot=%s;" % [str(peer_id), int(pl.get("peer_id")), str(pl.get("rot"))]
+		var local: Dictionary = snap.get("local", {})
+		if local.has("rot") and abs(float(local.get("rot", 0.0))) > 0.001:
+			ok = false
+			detail += " peer%s local rot=%s;" % [str(peer_id), str(local.get("rot"))]
+	if ok:
+		_pass("rotation", "all players rotation == 0")
+	else:
+		_fail("rotation", detail)
+
+
+func _scenario_restart_match() -> void:
+	var before_count: int = get_tree().get_nodes_in_group("players").size()
+	var clients: PackedInt32Array = multiplayer.get_peers()
+	if clients.is_empty():
+		_fail("restart", "no clients")
+		return
+	var client_id: int = clients[0]
+	# Mess up state so restart must clear it.
+	Match.add_score(1, 5)
+	Match.add_score(client_id, 3)
+	Match.reassign_it(client_id)
+	var host_p := _player(1)
+	if host_p:
+		host_p.get_node("Inventory").add_item(1)
+		host_p.get_node("Health").take_damage(40)
+		host_p.call("_sync_health_to_peers")
+	await get_tree().create_timer(0.3).timeout
+	# Client restart request must be ignored (no drop, It stays client until host restarts).
+	var it_before_client_try: int = Match.current_it_player
+	relay.rpc_cmd.rpc_id(client_id, "restart_match", {})
+	await get_tree().create_timer(0.5).timeout
+	var after_client_try: int = get_tree().get_nodes_in_group("players").size()
+	if after_client_try < before_count:
+		_fail("restart_client_ignored", "client restart dropped players %d -> %d" % [before_count, after_client_try])
+		return
+	if Match.current_it_player != it_before_client_try:
+		_fail("restart_client_ignored", "client restart changed It unexpectedly")
+		return
+	_pass("restart_client_ignored", "client restart did nothing harmful")
+	# Host restart: keep players, reset It to host, clear scores.
+	if arena.has_method("restart_from_ui"):
+		arena.call("restart_from_ui")
+	await get_tree().create_timer(0.8).timeout
+	await _collect_snapshots()
+	var after_host: int = get_tree().get_nodes_in_group("players").size()
+	var ok := after_host >= before_count and Match.current_it_player == 1 and Match.match_started
+	var detail := "players=%d it=%d started=%s" % [after_host, Match.current_it_player, Match.match_started]
+	for peer_id in relay.reports.keys():
+		var snap: Dictionary = relay.reports[peer_id].get("snapshot", {})
+		if int(snap.get("player_count", 0)) < before_count:
+			ok = false
+			detail += " peer%s count=%s;" % [str(peer_id), str(snap.get("player_count"))]
+		if int(snap.get("it", -1)) != 1:
+			ok = false
+			detail += " peer%s it=%s;" % [str(peer_id), str(snap.get("it"))]
+		if not bool(snap.get("started", false)):
+			ok = false
+			detail += " peer%s not started;" % str(peer_id)
+		for pl in snap.get("players", []):
+			if int(pl.get("health", 0)) < 100 or not bool(pl.get("alive")):
+				ok = false
+				detail += " peer%s player%d not full;" % [str(peer_id), int(pl.get("peer_id"))]
+			for s in pl.get("slots", []):
+				if int(s) != 0:
+					ok = false
+					detail += " peer%s inv not clear;" % str(peer_id)
+					break
+	if ok:
+		_pass("restart_server", detail)
+	else:
+		_fail("restart_server", detail)
 
 
 func _scenario_inventory_and_contest() -> void:

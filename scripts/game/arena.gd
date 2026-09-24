@@ -46,7 +46,6 @@ func _add_pickup(net_id: int, item_id: int, pos: Vector2) -> void:
 
 func apply_pickup_snapshot(pickups_data: Array) -> void:
 	## World state for late joiners: replace local pickups with the server list.
-	## Syncing deltas is not enough when someone joins mid-match.
 	for c in pickups_root.get_children():
 		c.queue_free()
 	for entry in pickups_data:
@@ -54,17 +53,60 @@ func apply_pickup_snapshot(pickups_data: Array) -> void:
 
 
 func restart_from_ui() -> void:
-	network_spawner.clear_players()
-	for c in pickups_root.get_children():
-		c.queue_free()
-	await get_tree().process_frame
-	_spawn_default_pickups()
+	## Only the host/server may restart. Clients must not destroy the session.
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
+		return
+	_server_restart_match()
+
+
+func _server_restart_match() -> void:
+	## Keep every connected player node. Reset state in place and rebuild pickups.
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
+		return
+	# Offline path
 	if multiplayer.multiplayer_peer == null:
-		var player: CharacterBody2D = network_spawner.spawn_local_offline_player()
+		_reset_pickups_local()
+		for n in get_tree().get_nodes_in_group("players"):
+			if n.has_method("reset_for_new_match"):
+				var spawn: Vector2 = _spawn_pos_for(int(n.get("peer_id")))
+				n.call("reset_for_new_match", true, spawn)
 		Match.restart_match(1)
-		if player:
-			(player as Node).get_node("Tag").call("set_it", true)
+		return
+	# Online: server resets, then tells everyone (call_local so host applies too).
+	_rpc_restart_match.rpc()
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_restart_match() -> void:
+	## All peers: reset pickups + each existing player. Do not free MultiplayerSpawner nodes.
+	_reset_pickups_local()
+	for n in get_tree().get_nodes_in_group("players"):
+		if not (n is CharacterBody2D):
+			continue
+		var pid: int = int(n.get("peer_id"))
+		var spawn: Vector2 = _spawn_pos_for(pid)
+		var as_it: bool = (pid == 1) # Host is It at match start.
+		if n.has_method("reset_for_new_match"):
+			n.call("reset_for_new_match", as_it, spawn)
+	if multiplayer.is_server():
+		Match.restart_match(1)
 	else:
-		if multiplayer.is_server():
-			network_spawner.begin_online_session()
-			Match.restart_match(1)
+		# Clients receive match state via Match.start_match RPC from restart_match on server.
+		pass
+
+
+func _reset_pickups_local() -> void:
+	# Free immediately so restart does not leave a frame with 0 or duplicate pickups.
+	var old: Array = pickups_root.get_children()
+	for c in old:
+		pickups_root.remove_child(c)
+		c.free()
+	_spawn_default_pickups()
+
+
+func _spawn_pos_for(peer_id: int) -> Vector2:
+	var markers: Array[Marker2D] = spawn_manager.player_spawn_markers
+	if markers.is_empty():
+		return Vector2(200, 200)
+	var idx: int = abs(peer_id - 1) % markers.size()
+	return markers[idx].global_position
