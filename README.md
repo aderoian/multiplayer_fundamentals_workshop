@@ -4,7 +4,7 @@ Convert a working **offline** top-down tag game into a small multiplayer arena u
 
 **Required Godot version:** 4.3+ (validated with **4.3.stable**)
 
-**You are here:** `workshop/06-health` — damage/death/respawn are server-authoritative.
+**You are here:** `workshop/07-inventory` — pickup/use are server-validated; first request wins.
 
 **Solution branch:** `workshop/10-complete`
 
@@ -85,13 +85,13 @@ git checkout checkpoint-05
 
 ---
 
-## Workshop TODO locations (this branch: 06-health)
+## Workshop TODO locations (this branch: 07-inventory)
 
-| Topic | File | Status on 06 |
+| Topic | File | Status on 07 |
 |-------|------|----------------|
-| Connect → movement + tag + health | player / match / network | Done |
-| Inventory / pickup requests | `inventory.gd`, `pickup.gd`, `player.gd` | TODO (07) |
+| Connect → inventory | player / pickup / network | Done |
 | Match timer / score replication | `match_manager.gd` | TODO (08) |
+| Server-owned pickup list as world state | arena / match | TODO (08) |
 | Late join snapshot | spawner / match | TODO (09) |
 | It reassignment on disconnect | match / spawner | TODO (10) |
 

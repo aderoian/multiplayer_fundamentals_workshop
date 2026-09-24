@@ -34,6 +34,7 @@ func _spawn_default_pickups() -> void:
 	for i in range(mini(types.size(), markers.size())):
 		var p: Area2D = PICKUP_SCENE.instantiate() as Area2D
 		p.item_id = types[i]
+		p.set("pickup_net_id", i + 1) # stable across peers when spawn order matches
 		pickups_root.add_child(p)
 		p.global_position = markers[i].global_position
 

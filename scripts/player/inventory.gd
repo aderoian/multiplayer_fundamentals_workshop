@@ -22,14 +22,12 @@ const SPEED_BOOST_MULTIPLIER: float = 1.6
 var slots: Array[int] = [ItemId.NONE, ItemId.NONE, ItemId.NONE]
 var speed_boost_time_left: float = 0.0
 
-# WORKSHOP TODO:
-# Inventory and world pickups are split across PLAYER STATE and WORLD STATE.
-# 1) Who owns slots? Server owns true inventory; clients display a copy.
-# 2) Who may change? Client sends pickup/use REQUEST; server validates (exists, range, space, alive).
-# 3) Who needs it? Owner UI + everyone if you show remote inventory; at minimum sync after change.
-# 4) Late join? Send current slots + active speed/shield timers.
-# Concept: two players grabbing the same pickup — only first valid server request wins (07).
-# Change: request_pickup / request_use_item RPCs; server mutates and replicates.
+# Ownership (inventory):
+# 1) Who owns slots? Server owns true inventory.
+# 2) Who may change? Client sends pickup/use REQUEST; server validates.
+# 3) Who needs it? At least the owner UI; we sync slots after changes.
+# 4) Late join? Send current slots + speed/shield timers.
+# Two players, one pickup: first valid server request wins.
 
 
 func _process(delta: float) -> void:

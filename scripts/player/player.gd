@@ -133,7 +133,94 @@ func _should_process_input() -> bool:
 
 
 func _try_use_item(slot_index: int) -> void:
-	inventory.use_slot(slot_index, health)
+	if multiplayer.multiplayer_peer == null:
+		inventory.use_slot(slot_index, health)
+		return
+	if not is_multiplayer_authority():
+		return
+	request_use_item.rpc_id(1, slot_index)
+
+
+func request_pickup_from_world(pickup: Node) -> void:
+	if multiplayer.multiplayer_peer == null:
+		collect_pickup_offline(pickup)
+		return
+	if not is_multiplayer_authority():
+		return
+	if pickup == null or not is_instance_valid(pickup):
+		return
+	var net_id: int = int(pickup.get("pickup_net_id"))
+	request_pickup.rpc_id(1, net_id)
+
+
+@rpc("any_peer", "reliable")
+func request_pickup(pickup_net_id: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender == 0:
+		sender = multiplayer.get_unique_id()
+	if sender != peer_id:
+		return
+	if not health.is_alive or not inventory.has_space():
+		return
+	var pickup: Node = _find_pickup(pickup_net_id)
+	if pickup == null:
+		return
+	if global_position.distance_to((pickup as Node2D).global_position) > WorldPickup.PICKUP_RANGE:
+		return
+	var item_id: int = int(pickup.call("get_item_id"))
+	if not inventory.add_item(item_id):
+		return
+	# Consume first — second requester finds pickup gone.
+	pickup.queue_free()
+	rpc_sync_inventory.rpc(inventory.slots.duplicate())
+	rpc_remove_pickup.rpc(pickup_net_id)
+
+
+@rpc("any_peer", "reliable")
+func request_use_item(slot_index: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender == 0:
+		sender = multiplayer.get_unique_id()
+	if sender != peer_id:
+		return
+	if not inventory.use_slot(slot_index, health):
+		return
+	rpc_sync_inventory.rpc(inventory.slots.duplicate())
+	_sync_health_to_peers()
+	rpc_sync_powerups.rpc(inventory.speed_boost_time_left, health.has_shield)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func rpc_sync_inventory(slots: Array) -> void:
+	for i in range(mini(slots.size(), InventoryComponent.MAX_SLOTS)):
+		inventory.slots[i] = int(slots[i])
+	inventory.inventory_changed.emit(inventory.slots.duplicate())
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_sync_powerups(speed_left: float, shield: bool) -> void:
+	inventory.speed_boost_time_left = speed_left
+	inventory.speed_boost_changed.emit(speed_left > 0.0, speed_left)
+	health.has_shield = shield
+	health.health_changed.emit(health.health, health.max_health)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func rpc_remove_pickup(pickup_net_id: int) -> void:
+	var pickup: Node = _find_pickup(pickup_net_id)
+	if pickup and is_instance_valid(pickup):
+		pickup.queue_free()
+
+
+func _find_pickup(pickup_net_id: int) -> Node:
+	for n in get_tree().get_nodes_in_group("pickups"):
+		if int(n.get("pickup_net_id")) == pickup_net_id:
+			return n
+	return null
 
 
 func _on_body_entered(body: Node) -> void:
