@@ -1,5 +1,5 @@
-extends Node
-## MatchManager — MATCH STATE (timer, scores, started, current It).
+﻿extends Node
+## MatchManager ΓÇö MATCH STATE (timer, scores, started, current It).
 ##
 ## Distinct from:
 ## - Player state: position, health, inventory, is_it
@@ -49,7 +49,7 @@ func _process(delta: float) -> void:
 
 
 func _should_tick_timer_locally() -> bool:
-	# Offline: no peer → tick locally. Online: ONLY the server ticks.
+	# Offline: no peer ΓåÆ tick locally. Online: ONLY the server ticks.
 	if multiplayer.multiplayer_peer == null:
 		return true
 	return multiplayer.is_server()
@@ -242,7 +242,7 @@ func apply_snapshot(data: Dictionary) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func rpc_late_join_snapshot(match_data: Dictionary, players_data: Array, pickups_data: Array) -> void:
-	## Synchronizing *changes* is not enough — late joiners need a full snapshot.
+	## Synchronizing *changes* is not enough ΓÇö late joiners need a full snapshot.
 	apply_snapshot(match_data)
 	# Rebuild world pickups from server list.
 	var arena := get_tree().get_first_node_in_group("arena")
@@ -274,3 +274,33 @@ func build_and_send_late_join(to_peer: int) -> void:
 			"pos": (p as Node2D).global_position,
 		})
 	rpc_late_join_snapshot.rpc_id(to_peer, to_snapshot(), players_data, pickups_data)
+
+
+func reassign_it(next_it: int) -> void:
+	## Disconnect path: transfer It without dealing tag damage.
+	if not multiplayer.is_server() and multiplayer.multiplayer_peer != null:
+		return
+	set_current_it(next_it)
+	_replicate_scores()
+	rpc_force_it.rpc(next_it)
+
+
+@rpc("authority", "call_local", "reliable")
+func rpc_force_it(next_it: int) -> void:
+	current_it_player = next_it
+	it_changed.emit(next_it)
+	for n in get_tree().get_nodes_in_group("players"):
+		if not (n is CharacterBody2D):
+			continue
+		var tag: TagComponent = n.get_node("Tag") as TagComponent
+		tag.set_it(int(n.get("peer_id")) == next_it)
+	match_updated.emit()
+
+
+@rpc("authority", "call_local", "reliable")
+func rpc_remove_world_pickup(pickup_net_id: int) -> void:
+	## World-state change: remove a pickup on every peer (autoload path is stable).
+	for n in get_tree().get_nodes_in_group("pickups"):
+		if int(n.get("pickup_net_id")) == pickup_net_id:
+			n.queue_free()
+			return
