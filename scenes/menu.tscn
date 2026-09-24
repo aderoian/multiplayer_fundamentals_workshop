@@ -140,6 +140,6 @@ autowrap_mode = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(0.55, 0.6, 0.68, 1)
 theme_override_font_sizes/font_size = 11
-text = "Host/Join connect via ENet. Player spawning comes in the next checkpoint."
+text = "Complete reference: Host/Join work. Start attendees on workshop/00-starter."
 horizontal_alignment = 1
 autowrap_mode = 2

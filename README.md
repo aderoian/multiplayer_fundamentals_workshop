@@ -4,7 +4,9 @@ Convert a working **offline** top-down tag game into a small multiplayer arena u
 
 **Required Godot version:** 4.3+ (validated with **4.3.stable**)
 
-**You are here:** `workshop/09-late-join` — mid-match joiners receive a full state snapshot.
+**You are here:** `workshop/10-complete` — full reference solution. Networking TODOs are complete.
+
+**Attendees start on:** `workshop/00-starter`
 
 **Solution branch:** `workshop/10-complete`
 
@@ -85,15 +87,22 @@ git checkout checkpoint-05
 
 ---
 
-## Workshop TODO locations (this branch: 09-late-join)
+## Workshop TODO locations (this branch: 10-complete)
 
-| Topic | File | Status on 09 |
-|-------|------|----------------|
-| Full workshop networking except polish | most files | Done |
-| It reassignment when It disconnects | match / spawner | TODO (10) |
-| Remove obsolete WORKSHOP TODO markers | whole project | TODO (10) |
+All networking `WORKSHOP TODO` markers are **complete** on this branch. Ownership decisions remain as short teaching comments (who owns / who changes / who receives / late join).
 
-Late join: `Match.build_and_send_late_join` / `rpc_late_join_snapshot` — deltas alone are not enough.
+| Topic | Reference location | Status |
+|-------|-------------------|--------|
+| ENet host/join | `network/network_manager.gd` | Done |
+| Spawn / despawn / It reassignment | `network/network_player_spawner.gd` | Done |
+| Authority + movement sync | `scripts/player/player.gd`, `scenes/player.tscn` | Done |
+| Tag request → validate → result | `player.gd` `request_tag`, `Match.rpc_apply_tag_result` | Done |
+| Health / death / respawn | `scripts/player/health.gd`, `player.gd` | Done |
+| Inventory / pickup | `player.gd` requests, `scripts/world/pickup.gd` | Done |
+| Match timer / scores | `scripts/game/match_manager.gd` | Done |
+| Late-join snapshot | `Match.build_and_send_late_join` | Done |
+
+On earlier branches, search for `WORKSHOP TODO` to see the incomplete markers.
 
 ---
 

@@ -65,9 +65,27 @@ func _on_peer_connected(id: int) -> void:
 
 func _on_peer_disconnected(id: int) -> void:
 	if multiplayer.is_server():
+		var was_it: bool = (Match.current_it_player == id)
 		_despawn_for_peer(id)
+		Match.remove_player_score(id)
+		if was_it:
+			_reassign_it_after_disconnect()
 	players.erase(id)
-	Match.remove_player_score(id)
+
+
+func _reassign_it_after_disconnect() -> void:
+	## If the player who is It leaves, server picks another remaining peer and syncs.
+	var next_it: int = -1
+	for pid in players.keys():
+		next_it = int(pid)
+		break
+	if next_it < 0:
+		next_it = 1
+	Match.set_current_it(next_it)
+	Match._replicate_scores()
+	# Reuse tag result channel so every peer updates IT visuals.
+	Match.rpc_apply_tag_result.rpc(next_it, next_it)
+	print("[Spawner] It reassigned to peer %d after disconnect" % next_it)
 
 
 func _spawn_for_peer(peer_id: int, display_name: String) -> void:
