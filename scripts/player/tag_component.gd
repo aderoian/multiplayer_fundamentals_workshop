@@ -32,14 +32,11 @@ func begin_cooldown() -> void:
 	_cooldown_left = TAG_COOLDOWN_SEC
 
 
-# WORKSHOP TODO:
-# Tag transfer is PLAYER + MATCH state (is_it on players, current_it_player on Match).
-# 1) Who owns It? The server owns who is currently It.
-# 2) Who may change? Client must NOT set another player's is_it. Send a tag REQUEST instead.
-# 3) Who needs it? Everyone — visuals ("IT" label) and who may tag next.
+# Ownership (tag / current It):
+# 1) Who owns this? Server owns current_it_player and each is_it.
+# 2) Who may change? Clients send a REQUEST; server validates and applies.
+# 3) Who needs it? Everyone (IT label + who may tag).
 # 4) Late join? Snapshot must include current_it_player / each is_it.
-# Concept: request → server validates (sender is It, target exists, close enough, alive) → result (05).
-# Change: replace direct try_tag_local with an RPC request; server updates Match + each TagComponent.
 
 
 func try_tag_local(target_player: Node) -> bool:

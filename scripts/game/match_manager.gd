@@ -139,3 +139,33 @@ func restart_match(initial_it_peer_id: int = 1) -> void:
 	for id in kept_ids:
 		player_scores[id] = 0
 	start_match(initial_it_peer_id)
+
+
+@rpc("authority", "call_local", "reliable")
+func rpc_apply_tag_result(tagger_id: int, target_id: int) -> void:
+	## Server broadcasts a validated tag transfer. Everyone updates It visuals.
+	current_it_player = target_id
+	it_changed.emit(target_id)
+	match_updated.emit()
+	for n in get_tree().get_nodes_in_group("players"):
+		if not (n is CharacterBody2D):
+			continue
+		var pid: int = int(n.get("peer_id"))
+		var tag: TagComponent = n.get_node("Tag") as TagComponent
+		if pid == target_id:
+			tag.set_it(true)
+			tag.begin_cooldown()
+		elif pid == tagger_id:
+			tag.set_it(false)
+			tag.begin_cooldown()
+		else:
+			tag.set_it(false)
+	# Notify players so server can apply damage (06 hooks here too).
+	var target: Node = null
+	for n in get_tree().get_nodes_in_group("players"):
+		if int(n.get("peer_id")) == target_id:
+			target = n
+			break
+	if target and target.has_method("on_tagged_by_network"):
+		target.call("on_tagged_by_network", tagger_id)
+	print("[Match] tag result %d -> %d" % [tagger_id, target_id])

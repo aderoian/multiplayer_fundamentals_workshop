@@ -4,7 +4,7 @@ Convert a working **offline** top-down tag game into a small multiplayer arena u
 
 **Required Godot version:** 4.3+ (validated with **4.3.stable**)
 
-**You are here:** `workshop/04-movement` — position syncs; tag/health/inventory still local/unsafe online.
+**You are here:** `workshop/05-tag-system` — tag is request→server→result; scores fully shared in 08.
 
 **Solution branch:** `workshop/10-complete`
 
@@ -85,19 +85,17 @@ git checkout checkpoint-05
 
 ---
 
-## Workshop TODO locations (this branch: 04-movement)
+## Workshop TODO locations (this branch: 05-tag-system)
 
-| Topic | File | Status on 04 |
+| Topic | File | Status on 05 |
 |-------|------|----------------|
 | Connect / spawn / authority / movement | network + player | Done |
-| Tag request RPC | `scripts/player/tag_component.gd`, `player.gd` | TODO (05) |
-| Health authority | `health.gd`, `player.gd` | TODO (06) |
-| Inventory / pickup | `inventory.gd`, `pickup.gd` | TODO (07) |
-| Match timer / scores | `match_manager.gd` | TODO (08) |
-| Death/respawn authority | `player.gd` | TODO (06) |
+| Tag request RPC | `player.gd` `request_tag`, `Match.rpc_apply_tag_result` | Done |
+| Score dictionary replication | `match_manager.gd` | TODO (08) — host sees scores |
+| Health authority / sync | `health.gd`, `player.gd` | TODO (06) |
+| Inventory / pickup | inventory / pickup | TODO (07) |
+| Match timer replication | match_manager | TODO (08) |
 | Late join snapshot | spawner / match | TODO (09) |
-
-Remote movement looks slightly late; **no client prediction** (out of scope).
 
 ---
 

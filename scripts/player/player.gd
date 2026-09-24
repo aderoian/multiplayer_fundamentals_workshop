@@ -148,10 +148,11 @@ func _on_body_entered(body: Node) -> void:
 	if multiplayer.multiplayer_peer == null:
 		_attempt_tag_offline(body)
 		return
-	# WORKSHOP TODO:
-	# Online: do not set the other player's is_it from this client.
-	# Send a tag REQUEST to the server; server validates and broadcasts the result (05).
-	_attempt_tag_offline(body)
+	# Online: only the authority that is It sends a REQUEST; server validates.
+	if not is_multiplayer_authority():
+		return
+	var target_id: int = int(body.get("peer_id"))
+	request_tag.rpc_id(1, target_id)
 
 
 func _attempt_tag_offline(target: Node) -> void:
@@ -163,8 +164,62 @@ func receive_tag_offline(from_peer_id: int) -> void:
 	tag_comp.set_it(true)
 	tag_comp.begin_cooldown()
 	Match.set_current_it(peer_id)
+	# Damage stays local offline; checkpoint 06 makes health server-authoritative online.
 	health.take_damage(Match.TAG_DAMAGE)
 	print("[Tag] %s tagged by peer %d" % [display_name, from_peer_id])
+
+
+@rpc("any_peer", "reliable")
+func request_tag(target_peer_id: int) -> void:
+	## Client → server: ask to transfer It to target_peer_id.
+	if not multiplayer.is_server():
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender == 0:
+		sender = multiplayer.get_unique_id()
+	if not _server_validate_tag(sender, target_peer_id):
+		return
+	_server_apply_tag(sender, target_peer_id)
+
+
+func _server_validate_tag(tagger_id: int, target_id: int) -> bool:
+	if Match.current_it_player != tagger_id:
+		return false
+	var tagger: CharacterBody2D = _find_player(tagger_id)
+	var target: CharacterBody2D = _find_player(target_id)
+	if tagger == null or target == null:
+		return false
+	var t_health: HealthComponent = tagger.get_node("Health") as HealthComponent
+	var o_health: HealthComponent = target.get_node("Health") as HealthComponent
+	if not t_health.is_alive or not o_health.is_alive:
+		return false
+	var t_tag: TagComponent = tagger.get_node("Tag") as TagComponent
+	if not t_tag.can_tag_now():
+		return false
+	if tagger.global_position.distance_to(target.global_position) > TagComponent.TAG_RANGE:
+		return false
+	return true
+
+
+func _server_apply_tag(tagger_id: int, target_id: int) -> void:
+	Match.add_score(tagger_id, 1)
+	# WORKSHOP TODO (08): scores are match state — replicate player_scores to all peers.
+	# Tag RESULT (who is It) replicates via Match.rpc_apply_tag_result; host scoreboard is authoritative until 08.
+	Match.rpc_apply_tag_result.rpc(tagger_id, target_id)
+
+
+func on_tagged_by_network(from_peer_id: int) -> void:
+	## Called on every peer after a validated tag. Damage is server-only until checkpoint 06 syncs HP.
+	if multiplayer.multiplayer_peer == null or multiplayer.is_server():
+		health.take_damage(Match.TAG_DAMAGE)
+	print("[Tag] %s tagged by peer %d" % [display_name, from_peer_id])
+
+
+func _find_player(p_id: int) -> CharacterBody2D:
+	for n in get_tree().get_nodes_in_group("players"):
+		if n is CharacterBody2D and int(n.get("peer_id")) == p_id:
+			return n as CharacterBody2D
+	return null
 
 
 func collect_pickup_offline(pickup: Node) -> bool:
