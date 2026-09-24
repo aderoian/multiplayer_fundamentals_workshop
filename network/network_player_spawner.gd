@@ -52,9 +52,15 @@ func spawn_local_offline_player() -> CharacterBody2D:
 func _on_peer_connected(id: int) -> void:
 	if not multiplayer.is_server():
 		return
-	# Name may arrive via RPC shortly; spawn with placeholder then rename if needed.
 	var n: String = str(Network.peer_names.get(id, "Player_%d" % id))
 	_spawn_for_peer(id, n)
+	# MultiplayerSpawner replicates already-spawned players to the new peer.
+	# Explicit snapshot still required for match/player/world fields that are not spawn props.
+	# Defer so the joiner has entered the arena / spawned nodes.
+	get_tree().create_timer(0.35).timeout.connect(func() -> void:
+		if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+			Match.build_and_send_late_join(id)
+	)
 
 
 func _on_peer_disconnected(id: int) -> void:

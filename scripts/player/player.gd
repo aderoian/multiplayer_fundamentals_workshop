@@ -414,3 +414,40 @@ func _color_for_peer(id: int) -> Color:
 		Color(0.7, 0.5, 0.2),
 	]
 	return palette[abs(id) % palette.size()]
+
+
+func build_state_snapshot() -> Dictionary:
+	return {
+		"peer_id": peer_id,
+		"name": display_name,
+		"pos": global_position,
+		"rot": rotation,
+		"is_it": tag_comp.is_it,
+		"health": health.health,
+		"alive": health.is_alive,
+		"shield": health.has_shield,
+		"slots": inventory.slots.duplicate(),
+		"speed_left": inventory.speed_boost_time_left,
+	}
+
+
+func apply_state_snapshot(data: Dictionary) -> void:
+	## Late join: apply a full copy of this player's current state.
+	global_position = data.get("pos", global_position)
+	rotation = float(data.get("rot", rotation))
+	display_name = str(data.get("name", display_name))
+	if name_label:
+		name_label.text = display_name
+	tag_comp.set_it(bool(data.get("is_it", false)))
+	health.apply_replica(int(data.get("health", 100)), bool(data.get("alive", true)), bool(data.get("shield", false)))
+	var slots: Array = data.get("slots", [])
+	for i in range(mini(slots.size(), InventoryComponent.MAX_SLOTS)):
+		inventory.slots[i] = int(slots[i])
+	inventory.inventory_changed.emit(inventory.slots.duplicate())
+	inventory.speed_boost_time_left = float(data.get("speed_left", 0.0))
+	inventory.speed_boost_changed.emit(inventory.speed_boost_time_left > 0.0, inventory.speed_boost_time_left)
+	if not health.is_alive:
+		modulate = Color(1, 1, 1, 0.35)
+	else:
+		modulate = Color(1, 1, 1, 1)
+	_update_visuals()

@@ -4,7 +4,7 @@ Convert a working **offline** top-down tag game into a small multiplayer arena u
 
 **Required Godot version:** 4.3+ (validated with **4.3.stable**)
 
-**You are here:** `workshop/08-world-state` — server owns timer, scores, and match lifecycle.
+**You are here:** `workshop/09-late-join` — mid-match joiners receive a full state snapshot.
 
 **Solution branch:** `workshop/10-complete`
 
@@ -85,15 +85,15 @@ git checkout checkpoint-05
 
 ---
 
-## Workshop TODO locations (this branch: 08-world-state)
+## Workshop TODO locations (this branch: 09-late-join)
 
-| Topic | File | Status on 08 |
+| Topic | File | Status on 09 |
 |-------|------|----------------|
-| Connect → world/match state | player / match / network | Done |
-| Late join snapshot | `Match.to_snapshot`, spawner | TODO (09) |
-| It reassignment on disconnect | match / spawner | TODO (10) |
+| Full workshop networking except polish | most files | Done |
+| It reassignment when It disconnects | match / spawner | TODO (10) |
+| Remove obsolete WORKSHOP TODO markers | whole project | TODO (10) |
 
-Player vs world vs match state is documented in `scripts/game/match_manager.gd`.
+Late join: `Match.build_and_send_late_join` / `rpc_late_join_snapshot` — deltas alone are not enough.
 
 ---
 

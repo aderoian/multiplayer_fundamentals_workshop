@@ -12,6 +12,7 @@ const PICKUP_SCENE: PackedScene = preload("res://scenes/pickup.tscn")
 
 
 func _ready() -> void:
+	add_to_group("arena")
 	spawn_manager.gather()
 	network_spawner.setup(players_root, spawn_manager.player_spawn_markers, multiplayer_spawner)
 	_spawn_default_pickups()
@@ -32,11 +33,24 @@ func _spawn_default_pickups() -> void:
 	var types: Array[int] = [1, 2, 3, 1, 2, 3]
 	var markers: Array[Marker2D] = spawn_manager.pickup_spawn_markers
 	for i in range(mini(types.size(), markers.size())):
-		var p: Area2D = PICKUP_SCENE.instantiate() as Area2D
-		p.item_id = types[i]
-		p.set("pickup_net_id", i + 1) # stable across peers when spawn order matches
-		pickups_root.add_child(p)
-		p.global_position = markers[i].global_position
+		_add_pickup(i + 1, types[i], markers[i].global_position)
+
+
+func _add_pickup(net_id: int, item_id: int, pos: Vector2) -> void:
+	var p: Area2D = PICKUP_SCENE.instantiate() as Area2D
+	p.item_id = item_id
+	p.set("pickup_net_id", net_id)
+	pickups_root.add_child(p)
+	p.global_position = pos
+
+
+func apply_pickup_snapshot(pickups_data: Array) -> void:
+	## World state for late joiners: replace local pickups with the server list.
+	## Syncing deltas is not enough when someone joins mid-match.
+	for c in pickups_root.get_children():
+		c.queue_free()
+	for entry in pickups_data:
+		_add_pickup(int(entry.get("id", 0)), int(entry.get("item_id", 1)), entry.get("pos", Vector2.ZERO))
 
 
 func restart_from_ui() -> void:

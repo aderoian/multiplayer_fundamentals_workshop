@@ -236,3 +236,41 @@ func apply_snapshot(data: Dictionary) -> void:
 	current_it_player = int(data.get("it", 1))
 	match_updated.emit()
 	it_changed.emit(current_it_player)
+	if match_over_shown:
+		match_over.emit(get_winner_peer_id(), player_scores.duplicate())
+
+
+@rpc("authority", "call_remote", "reliable")
+func rpc_late_join_snapshot(match_data: Dictionary, players_data: Array, pickups_data: Array) -> void:
+	## Synchronizing *changes* is not enough — late joiners need a full snapshot.
+	apply_snapshot(match_data)
+	# Rebuild world pickups from server list.
+	var arena := get_tree().get_first_node_in_group("arena")
+	if arena and arena.has_method("apply_pickup_snapshot"):
+		arena.call("apply_pickup_snapshot", pickups_data)
+	for entry in players_data:
+		var pid: int = int(entry.get("peer_id", 0))
+		for n in get_tree().get_nodes_in_group("players"):
+			if int(n.get("peer_id")) == pid and n.has_method("apply_state_snapshot"):
+				n.call("apply_state_snapshot", entry)
+				break
+	print("[Match] applied late-join snapshot it=%d time=%.1f pickups=%d" % [
+		current_it_player, match_time_remaining, pickups_data.size()
+	])
+
+
+func build_and_send_late_join(to_peer: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var players_data: Array = []
+	for n in get_tree().get_nodes_in_group("players"):
+		if n.has_method("build_state_snapshot"):
+			players_data.append(n.call("build_state_snapshot"))
+	var pickups_data: Array = []
+	for p in get_tree().get_nodes_in_group("pickups"):
+		pickups_data.append({
+			"id": int(p.get("pickup_net_id")),
+			"item_id": int(p.get("item_id")),
+			"pos": (p as Node2D).global_position,
+		})
+	rpc_late_join_snapshot.rpc_id(to_peer, to_snapshot(), players_data, pickups_data)
