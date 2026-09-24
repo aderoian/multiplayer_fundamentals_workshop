@@ -274,3 +274,24 @@ func build_and_send_late_join(to_peer: int) -> void:
 			"pos": (p as Node2D).global_position,
 		})
 	rpc_late_join_snapshot.rpc_id(to_peer, to_snapshot(), players_data, pickups_data)
+
+
+func reassign_it(next_it: int) -> void:
+	## Disconnect path: transfer It without dealing tag damage.
+	if not multiplayer.is_server() and multiplayer.multiplayer_peer != null:
+		return
+	set_current_it(next_it)
+	_replicate_scores()
+	rpc_force_it.rpc(next_it)
+
+
+@rpc("authority", "call_local", "reliable")
+func rpc_force_it(next_it: int) -> void:
+	current_it_player = next_it
+	it_changed.emit(next_it)
+	for n in get_tree().get_nodes_in_group("players"):
+		if not (n is CharacterBody2D):
+			continue
+		var tag: TagComponent = n.get_node("Tag") as TagComponent
+		tag.set_it(int(n.get("peer_id")) == next_it)
+	match_updated.emit()

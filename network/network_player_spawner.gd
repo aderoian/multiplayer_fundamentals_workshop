@@ -81,10 +81,7 @@ func _reassign_it_after_disconnect() -> void:
 		break
 	if next_it < 0:
 		next_it = 1
-	Match.set_current_it(next_it)
-	Match._replicate_scores()
-	# Reuse tag result channel so every peer updates IT visuals.
-	Match.rpc_apply_tag_result.rpc(next_it, next_it)
+	Match.reassign_it(next_it)
 	print("[Spawner] It reassigned to peer %d after disconnect" % next_it)
 
 
