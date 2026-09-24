@@ -209,17 +209,31 @@ func _server_apply_tag(tagger_id: int, target_id: int) -> void:
 
 
 func on_tagged_by_network(from_peer_id: int) -> void:
-	## Called on every peer after a validated tag. Damage is server-only until checkpoint 06 syncs HP.
+	## Runs on all peers after tag result. Only the server mutates health, then syncs.
 	if multiplayer.multiplayer_peer == null or multiplayer.is_server():
 		health.take_damage(Match.TAG_DAMAGE)
+		_sync_health_to_peers()
 	print("[Tag] %s tagged by peer %d" % [display_name, from_peer_id])
 
 
-func _find_player(p_id: int) -> CharacterBody2D:
-	for n in get_tree().get_nodes_in_group("players"):
-		if n is CharacterBody2D and int(n.get("peer_id")) == p_id:
-			return n as CharacterBody2D
-	return null
+func _sync_health_to_peers() -> void:
+	if multiplayer.multiplayer_peer == null:
+		return
+	if not multiplayer.is_server():
+		return
+	# any_peer: server must be allowed to push state on client-owned player nodes.
+	rpc_sync_health.rpc(health.health, health.is_alive, health.has_shield, global_position)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_sync_health(p_health: int, p_alive: bool, p_shield: bool, p_pos: Vector2) -> void:
+	## Server → clients: display server health; clients never invent HP.
+	health.apply_replica(p_health, p_alive, p_shield)
+	global_position = p_pos
+	if not p_alive:
+		modulate = Color(1, 1, 1, 0.35)
+	else:
+		modulate = Color(1, 1, 1, 1)
 
 
 func collect_pickup_offline(pickup: Node) -> bool:
@@ -241,12 +255,20 @@ func _on_health_changed(current: int, maximum: int) -> void:
 	health_bar.value = current
 
 
+func _find_player(p_id: int) -> CharacterBody2D:
+	for n in get_tree().get_nodes_in_group("players"):
+		if n is CharacterBody2D and int(n.get("peer_id")) == p_id:
+			return n as CharacterBody2D
+	return null
+
+
 func _on_died() -> void:
 	visible = true
 	modulate = Color(1, 1, 1, 0.35)
 	velocity = Vector2.ZERO
-	_respawn_timer = RESPAWN_DELAY
-	# WORKSHOP TODO (06): death/respawn must be server-authoritative and replicated.
+	# Only the server (or offline) starts the respawn timer.
+	if multiplayer.multiplayer_peer == null or multiplayer.is_server():
+		_respawn_timer = RESPAWN_DELAY
 
 
 func _on_respawned() -> void:
@@ -255,11 +277,23 @@ func _on_respawned() -> void:
 
 
 func _do_respawn() -> void:
+	## Server / offline respawn; then replicate.
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
+		return
 	var points := get_tree().get_nodes_in_group("respawn_points")
 	if points.size() > 0:
 		var idx: int = abs(peer_id) % points.size()
 		global_position = (points[idx] as Node2D).global_position
 	health.mark_respawned()
+	_sync_health_to_peers()
+	rpc_notify_respawn.rpc(global_position)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func rpc_notify_respawn(p_pos: Vector2) -> void:
+	global_position = p_pos
+	health.apply_replica(health.max_health, true, false)
+	modulate = Color(1, 1, 1, 1)
 
 
 func _on_tag_changed(_is_it: bool) -> void:

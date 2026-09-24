@@ -4,7 +4,7 @@ Convert a working **offline** top-down tag game into a small multiplayer arena u
 
 **Required Godot version:** 4.3+ (validated with **4.3.stable**)
 
-**You are here:** `workshop/05-tag-system` — tag is request→server→result; scores fully shared in 08.
+**You are here:** `workshop/06-health` — damage/death/respawn are server-authoritative.
 
 **Solution branch:** `workshop/10-complete`
 
@@ -85,17 +85,15 @@ git checkout checkpoint-05
 
 ---
 
-## Workshop TODO locations (this branch: 05-tag-system)
+## Workshop TODO locations (this branch: 06-health)
 
-| Topic | File | Status on 05 |
+| Topic | File | Status on 06 |
 |-------|------|----------------|
-| Connect / spawn / authority / movement | network + player | Done |
-| Tag request RPC | `player.gd` `request_tag`, `Match.rpc_apply_tag_result` | Done |
-| Score dictionary replication | `match_manager.gd` | TODO (08) — host sees scores |
-| Health authority / sync | `health.gd`, `player.gd` | TODO (06) |
-| Inventory / pickup | inventory / pickup | TODO (07) |
-| Match timer replication | match_manager | TODO (08) |
+| Connect → movement + tag + health | player / match / network | Done |
+| Inventory / pickup requests | `inventory.gd`, `pickup.gd`, `player.gd` | TODO (07) |
+| Match timer / score replication | `match_manager.gd` | TODO (08) |
 | Late join snapshot | spawner / match | TODO (09) |
+| It reassignment on disconnect | match / spawner | TODO (10) |
 
 ---
 
