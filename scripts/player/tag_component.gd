@@ -18,8 +18,6 @@ func _process(delta: float) -> void:
 
 
 func set_it(value: bool) -> void:
-	if is_it == value:
-		return
 	is_it = value
 	tag_changed.emit(is_it)
 
@@ -30,6 +28,10 @@ func can_tag_now() -> bool:
 
 func begin_cooldown() -> void:
 	_cooldown_left = TAG_COOLDOWN_SEC
+
+
+func begin_cooldown_sec(seconds: float) -> void:
+	_cooldown_left = maxf(_cooldown_left, seconds)
 
 
 # WORKSHOP TODO:
