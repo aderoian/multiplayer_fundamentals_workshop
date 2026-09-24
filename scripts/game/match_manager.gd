@@ -295,3 +295,12 @@ func rpc_force_it(next_it: int) -> void:
 		var tag: TagComponent = n.get_node("Tag") as TagComponent
 		tag.set_it(int(n.get("peer_id")) == next_it)
 	match_updated.emit()
+
+
+@rpc("authority", "call_local", "reliable")
+func rpc_remove_world_pickup(pickup_net_id: int) -> void:
+	## World-state change: remove a pickup on every peer (autoload path is stable).
+	for n in get_tree().get_nodes_in_group("pickups"):
+		if int(n.get("pickup_net_id")) == pickup_net_id:
+			n.queue_free()
+			return

@@ -105,10 +105,35 @@ func _physics_process(delta: float) -> void:
 	if dir.length_squared() > 0.0:
 		rotation = dir.angle()
 
-	# Position sync: MultiplayerSynchronizer on this scene replicates position/rotation
-	# from the authority. Remote movement looks slightly late — prediction / reconciliation
-	# are out of scope for this workshop (future topic).
-	# Offline (no multiplayer_peer) still uses this same local movement path.
+	_broadcast_transform()
+
+	# Position sync: authority sends transform (unreliable). MultiplayerSynchronizer also
+	# replicates for spawner-created peers. Remotes look slightly late — prediction is out of scope.
+
+
+func _broadcast_transform() -> void:
+	if multiplayer.multiplayer_peer == null:
+		return
+	if not is_multiplayer_authority():
+		return
+	rpc_set_transform.rpc(global_position, rotation)
+
+
+@rpc("any_peer", "unreliable_ordered", "call_remote")
+func rpc_set_transform(pos: Vector2, rot: float) -> void:
+	## Apply authority transform on remotes (also covers ensure-spawned players).
+	if is_multiplayer_authority():
+		return
+	global_position = pos
+	rotation = rot
+
+
+func force_set_transform(pos: Vector2) -> void:
+	## Test / teleport helper for the authority (or server placing bodies).
+	global_position = pos
+	position = pos
+	if multiplayer.multiplayer_peer != null and is_multiplayer_authority():
+		rpc_set_transform.rpc(pos, rotation)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -138,7 +163,15 @@ func _try_use_item(slot_index: int) -> void:
 		return
 	if not is_multiplayer_authority():
 		return
-	request_use_item.rpc_id(1, slot_index)
+	_send_use_item(slot_index)
+
+
+func _send_use_item(slot_index: int) -> void:
+	# Host cannot rpc_id(1) to itself with any_peer mode — call the handler directly.
+	if multiplayer.is_server():
+		_server_use_item(multiplayer.get_unique_id(), slot_index)
+	else:
+		request_use_item.rpc_id(1, slot_index)
 
 
 func request_pickup_from_world(pickup: Node) -> void:
@@ -150,7 +183,14 @@ func request_pickup_from_world(pickup: Node) -> void:
 	if pickup == null or not is_instance_valid(pickup):
 		return
 	var net_id: int = int(pickup.get("pickup_net_id"))
-	request_pickup.rpc_id(1, net_id)
+	_send_pickup_request(net_id)
+
+
+func _send_pickup_request(pickup_net_id: int) -> void:
+	if multiplayer.is_server():
+		_server_pickup(multiplayer.get_unique_id(), pickup_net_id)
+	else:
+		request_pickup.rpc_id(1, pickup_net_id)
 
 
 @rpc("any_peer", "reliable")
@@ -160,6 +200,10 @@ func request_pickup(pickup_net_id: int) -> void:
 	var sender: int = multiplayer.get_remote_sender_id()
 	if sender == 0:
 		sender = multiplayer.get_unique_id()
+	_server_pickup(sender, pickup_net_id)
+
+
+func _server_pickup(sender: int, pickup_net_id: int) -> void:
 	if sender != peer_id:
 		return
 	if not health.is_alive or not inventory.has_space():
@@ -175,7 +219,8 @@ func request_pickup(pickup_net_id: int) -> void:
 	# Consume first — second requester finds pickup gone.
 	pickup.queue_free()
 	rpc_sync_inventory.rpc(inventory.slots.duplicate())
-	rpc_remove_pickup.rpc(pickup_net_id)
+	# Broadcast via Match autoload so every peer removes it (stable node path).
+	Match.rpc_remove_world_pickup.rpc(pickup_net_id)
 
 
 @rpc("any_peer", "reliable")
@@ -185,6 +230,10 @@ func request_use_item(slot_index: int) -> void:
 	var sender: int = multiplayer.get_remote_sender_id()
 	if sender == 0:
 		sender = multiplayer.get_unique_id()
+	_server_use_item(sender, slot_index)
+
+
+func _server_use_item(sender: int, slot_index: int) -> void:
 	if sender != peer_id:
 		return
 	if not inventory.use_slot(slot_index, health):
@@ -209,11 +258,10 @@ func rpc_sync_powerups(speed_left: float, shield: bool) -> void:
 	health.health_changed.emit(health.health, health.max_health)
 
 
+## Deprecated path kept for clarity — prefer Match.rpc_remove_world_pickup.
 @rpc("any_peer", "call_local", "reliable")
 func rpc_remove_pickup(pickup_net_id: int) -> void:
-	var pickup: Node = _find_pickup(pickup_net_id)
-	if pickup and is_instance_valid(pickup):
-		pickup.queue_free()
+	Match.rpc_remove_world_pickup(pickup_net_id)
 
 
 func _find_pickup(pickup_net_id: int) -> Node:
@@ -239,7 +287,15 @@ func _on_body_entered(body: Node) -> void:
 	if not is_multiplayer_authority():
 		return
 	var target_id: int = int(body.get("peer_id"))
-	request_tag.rpc_id(1, target_id)
+	_send_tag_request(target_id)
+
+
+func _send_tag_request(target_id: int) -> void:
+	# Host cannot use rpc_id(1) on itself with any_peer RPCs — call handler directly.
+	if multiplayer.is_server():
+		_server_handle_tag(multiplayer.get_unique_id(), target_id)
+	else:
+		request_tag.rpc_id(1, target_id)
 
 
 func _attempt_tag_offline(target: Node) -> void:
@@ -264,9 +320,13 @@ func request_tag(target_peer_id: int) -> void:
 	var sender: int = multiplayer.get_remote_sender_id()
 	if sender == 0:
 		sender = multiplayer.get_unique_id()
-	if not _server_validate_tag(sender, target_peer_id):
+	_server_handle_tag(sender, target_peer_id)
+
+
+func _server_handle_tag(tagger_id: int, target_id: int) -> void:
+	if not _server_validate_tag(tagger_id, target_id):
 		return
-	_server_apply_tag(sender, target_peer_id)
+	_server_apply_tag(tagger_id, target_id)
 
 
 func _server_validate_tag(tagger_id: int, target_id: int) -> bool:

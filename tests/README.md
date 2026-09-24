@@ -8,19 +8,30 @@ These scripts are **optional**. Workshop teaching does not depend on them.
 .\tools\Godot_v4.3-stable_win64_console.exe --headless --path . --quit-after 2
 ```
 
-## Multiplayer smoke (host + clients)
+## Gameplay multiplayer smoke (required for release confidence)
 
-`smoke_multiplayer.gd` boots multiple Godot processes (host + clients) when run with:
+Launches real Godot processes (host + N clients) against `workshop/10-complete`:
 
 ```powershell
-.\tools\Godot_v4.3-stable_win64_console.exe --headless --path . -s res://tests/smoke_multiplayer.gd -- --workshop-smoke
+.\tests\run_gameplay_smoke.ps1 -Clients 1 -Port 7791
+.\tests\run_gameplay_smoke.ps1 -Clients 2 -Port 7792 -LateJoin
 ```
 
-Requires the Godot binary path (or `GODOT` env var). Output goes to stdout / `tests/output/`.
+Uses `tests/mp_boot.tscn` (autoload-safe) and `tests/test_relay.gd` (RPC test bus). Results: `tests/output/gameplay_results.json`.
 
-What it tries to verify:
-- Host listens and clients connect
-- Players spawn
-- Basic RPC reachability
+Scenarios covered:
+- connection + spawn
+- movement replication
+- tag transfer + damage
+- death / respawn
+- contested pickup (one winner)
+- scores / timer agreement
+- late join snapshot agreement
+- It reassignment on disconnect + despawn
 
-Full gameplay playtests (tag, inventory contests, late join) still need manual or extended automation.
+## Legacy connection-only smoke
+
+```powershell
+$env:GODOT = (Resolve-Path .\tools\Godot_v4.3-stable_win64_console.exe).Path
+.\tools\Godot_v4.3-stable_win64_console.exe --headless --path . -s res://tests/smoke_multiplayer.gd -- --workshop-smoke
+```
