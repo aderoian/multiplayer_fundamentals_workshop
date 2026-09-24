@@ -91,19 +91,14 @@ func play_offline(p_name: String = "Player") -> void:
 func _on_peer_connected(id: int) -> void:
 	print("[Network] peer_connected id=%d" % id)
 	peer_list_changed.emit()
-	# WORKSHOP TODO:
-	# What is wrong: A connected peer does not yet get a Player CharacterBody2D.
-	# Concept: spawn/despawn one player instance per peer_id (checkpoint 02).
-	# Why it matters: Without instances there is nothing to move, tag, or sync.
-	# Change: on peer_connected (and for the host itself when entering the arena),
-	# spawn a player with that peer_id and name; despawn on peer_disconnected.
-	# Authority is checkpoint 03 — instances may still all read local input until then.
+	# Player instances are created by NetworkPlayerSpawner (checkpoint 02).
 
 
 func _on_peer_disconnected(id: int) -> void:
 	print("[Network] peer_disconnected id=%d" % id)
 	peer_names.erase(id)
 	peer_list_changed.emit()
+	# Despawn is handled by NetworkPlayerSpawner.
 
 
 func _on_connected_to_server() -> void:

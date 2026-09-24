@@ -20,6 +20,7 @@ var display_name: String = "Player"
 var is_local_controlled: bool = true
 var _respawn_timer: float = -1.0
 var _base_color: Color = Color(0.2, 0.55, 0.95)
+var _setup_applied: bool = false
 
 
 func _ready() -> void:
@@ -31,25 +32,32 @@ func _ready() -> void:
 	inventory.speed_boost_changed.connect(_on_speed_boost_changed)
 	overlap_area.body_entered.connect(_on_body_entered)
 	_on_health_changed(health.health, health.max_health)
-	_update_visuals()
+	_apply_setup()
 
 
 func setup_player(p_peer_id: int, p_name: String, p_local: bool) -> void:
+	## Safe to call before the node enters the tree (MultiplayerSpawner spawn_function).
 	peer_id = p_peer_id
 	display_name = p_name
 	is_local_controlled = p_local
+	_base_color = _color_for_peer(peer_id)
+	if is_node_ready():
+		_apply_setup()
+
+
+func _apply_setup() -> void:
+	if tag_comp == null:
+		return
 	tag_comp.peer_id = peer_id
 	name_label.text = display_name
-	_base_color = _color_for_peer(peer_id)
-	# Camera: only the locally controlled player should own the view.
-	camera.enabled = p_local
-	_update_visuals()
+	camera.enabled = is_local_controlled
 	Match.ensure_player_score(peer_id)
-	# Host / local peer starts as It when match begins; offline: peer 1 is It.
 	if peer_id == Match.current_it_player:
 		tag_comp.set_it(true)
 	else:
 		tag_comp.set_it(false)
+	_update_visuals()
+	_setup_applied = true
 
 	# WORKSHOP TODO:
 	# Input & camera are about AUTHORITY, not "who exists".
@@ -59,7 +67,7 @@ func setup_player(p_peer_id: int, p_name: String, p_local: bool) -> void:
 	# 4) Late join? Spawner/snapshot must create this node with correct authority.
 	# Concept: set_multiplayer_authority(peer_id); only authority reads WASD (03).
 	# Change: replace is_local_controlled checks with is_multiplayer_authority() once networked.
-	# Until checkpoint 03, offline may still all read local input — that is intentional leftover.
+	# Until checkpoint 03, every machine may still read local input — intentional leftover.
 
 
 func _physics_process(delta: float) -> void:
@@ -75,7 +83,6 @@ func _physics_process(delta: float) -> void:
 		return
 
 	if not _should_process_input():
-		# Remote bodies wait for sync (checkpoint 04). Offline / local still move below.
 		return
 
 	var dir := Vector2.ZERO
@@ -120,7 +127,6 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _should_process_input() -> bool:
-	# Offline: no peer → local control. Online: later checkpoints use multiplayer authority.
 	if multiplayer.multiplayer_peer == null:
 		return is_local_controlled
 	# WORKSHOP TODO (checkpoint 03): return is_multiplayer_authority()
@@ -128,7 +134,6 @@ func _should_process_input() -> bool:
 
 
 func _try_use_item(slot_index: int) -> void:
-	# Offline applies immediately. Multiplayer will request server validation (07).
 	inventory.use_slot(slot_index, health)
 
 
@@ -141,19 +146,17 @@ func _on_body_entered(body: Node) -> void:
 		return
 	if not health.is_alive:
 		return
-	# Offline tag transfer
 	if multiplayer.multiplayer_peer == null:
 		_attempt_tag_offline(body)
 		return
 	# WORKSHOP TODO:
 	# Online: do not set the other player's is_it from this client.
 	# Send a tag REQUEST to the server; server validates and broadcasts the result (05).
-	_attempt_tag_offline(body) # temporary local behavior until 05 — will be replaced
+	_attempt_tag_offline(body)
 
 
 func _attempt_tag_offline(target: Node) -> void:
 	if tag_comp.try_tag_local(target):
-		# Score for tagger; Match will fully sync scores in checkpoint 08.
 		Match.add_score(peer_id, 1)
 
 
@@ -161,7 +164,6 @@ func receive_tag_offline(from_peer_id: int) -> void:
 	tag_comp.set_it(true)
 	tag_comp.begin_cooldown()
 	Match.set_current_it(peer_id)
-	# Tag contact also deals damage via Health.take_damage (separate function on purpose).
 	health.take_damage(Match.TAG_DAMAGE)
 	print("[Tag] %s tagged by peer %d" % [display_name, from_peer_id])
 
@@ -219,6 +221,8 @@ func _on_speed_boost_changed(_active: bool, _time_left: float) -> void:
 
 
 func _update_visuals() -> void:
+	if tag_comp == null:
+		return
 	if tag_comp.is_it:
 		body_poly.color = Color(0.95, 0.35, 0.1)
 		it_label.visible = true

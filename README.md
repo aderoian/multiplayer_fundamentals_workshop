@@ -4,7 +4,7 @@ Convert a working **offline** top-down tag game into a small multiplayer arena u
 
 **Required Godot version:** 4.3+ (validated with **4.3.stable**)
 
-**You are here:** `workshop/01-connect` — ENet host/join works; players not spawned yet.
+**You are here:** `workshop/02-player-spawning` — peers spawn Player instances; input authority is next.
 
 **Solution branch:** `workshop/10-complete`
 
@@ -85,22 +85,23 @@ git checkout checkpoint-05
 
 ---
 
-## Workshop TODO locations (this branch: 01-connect)
+## Workshop TODO locations (this branch: 02-player-spawning)
 
-Search the repo for `WORKSHOP TODO` — every marker explains what is wrong, the concept, why it matters, and what to change.
+Search the repo for `WORKSHOP TODO`.
 
-| Topic | File | Status on 01 |
+| Topic | File | Status on 02 |
 |-------|------|----------------|
 | Host ENet server | `network/network_manager.gd` → `host_game` | Done |
 | Join ENet client | `network/network_manager.gd` → `join_game` | Done |
-| Spawn per peer | `network/network_manager.gd` (`peer_connected`), `network/network_player_spawner.gd` | TODO |
+| Spawn per peer | `network/network_player_spawner.gd` + `MultiplayerSpawner` | Done |
+| Input still wrong for remotes | `network/network_player_spawner.gd`, `scripts/player/player.gd` | TODO (03) |
 | Match timer / score ownership | `scripts/game/match_manager.gd` | TODO |
 | Health authority | `scripts/player/health.gd` | TODO |
 | Inventory / pickup authority | `scripts/player/inventory.gd`, `scripts/world/pickup.gd` | TODO |
 | Tag request RPC | `scripts/player/tag_component.gd`, `scripts/player/player.gd` | TODO |
-| Input / camera authority | `scripts/player/player.gd` → `setup_player` / `_should_process_input` | TODO |
-| Movement sync | `scripts/player/player.gd` → `_physics_process` | TODO |
-| Death/respawn authority | `scripts/player/player.gd` → `_on_died` | TODO |
+| Input / camera authority | `scripts/player/player.gd` | TODO |
+| Movement sync | `scripts/player/player.gd` | TODO |
+| Death/respawn authority | `scripts/player/player.gd` | TODO |
 
 ---
 

@@ -156,6 +156,10 @@ position = Vector2(600, 500)
 
 [node name="Pickups" type="Node2D" parent="."]
 
+[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://scenes/player.tscn")
+spawn_path = NodePath("../Players")
+
 [node name="SpawnManager" type="Node" parent="."]
 script = ExtResource("2_spawn")
 player_spawns_path = NodePath("../PlayerSpawns")

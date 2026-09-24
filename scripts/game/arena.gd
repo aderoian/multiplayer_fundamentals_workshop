@@ -1,25 +1,30 @@
 extends Node2D
-## Arena root — wires spawn manager, offline player, HUD, match lifecycle.
+## Arena root — wires spawn manager, offline/online players, HUD, match lifecycle.
 
 @onready var spawn_manager: SpawnManager = $SpawnManager
 @onready var players_root: Node2D = $Players
 @onready var pickups_root: Node2D = $Pickups
 @onready var hud: CanvasLayer = $HUD
 @onready var network_spawner: Node = $NetworkPlayerSpawner
+@onready var multiplayer_spawner: MultiplayerSpawner = $MultiplayerSpawner
 
 const PICKUP_SCENE: PackedScene = preload("res://scenes/pickup.tscn")
 
 
 func _ready() -> void:
 	spawn_manager.gather()
-	network_spawner.setup(players_root, spawn_manager.player_spawn_markers)
+	network_spawner.setup(players_root, spawn_manager.player_spawn_markers, multiplayer_spawner)
 	_spawn_default_pickups()
-	# Offline: spawn one local player and start match. Online spawn comes later.
 	if multiplayer.multiplayer_peer == null:
 		var player: CharacterBody2D = network_spawner.spawn_local_offline_player()
 		Match.start_match(1)
 		if player:
-			(player as Node).get_node("Tag").set_it(true)
+			(player as Node).get_node("Tag").call("set_it", true)
+	else:
+		# Online: spawn via MultiplayerSpawner (server). Host is It at match start.
+		network_spawner.begin_online_session()
+		if multiplayer.is_server():
+			Match.start_match(1)
 	hud.setup(self)
 
 
@@ -34,7 +39,6 @@ func _spawn_default_pickups() -> void:
 
 
 func restart_from_ui() -> void:
-	# Clear players and pickups, re-seed offline session.
 	network_spawner.clear_players()
 	for c in pickups_root.get_children():
 		c.queue_free()
@@ -44,6 +48,8 @@ func restart_from_ui() -> void:
 		var player: CharacterBody2D = network_spawner.spawn_local_offline_player()
 		Match.restart_match(1)
 		if player:
-			(player as Node).get_node("Tag").set_it(true)
+			(player as Node).get_node("Tag").call("set_it", true)
 	else:
-		Match.restart_match(1)
+		if multiplayer.is_server():
+			network_spawner.begin_online_session()
+			Match.restart_match(1)

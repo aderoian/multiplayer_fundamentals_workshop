@@ -6,7 +6,7 @@
 # | File | Role | Filled in |
 # |------|------|-----------|
 # | network_manager.gd | ENet host/join, peer signals, status | Done on 01-connect |
-# | network_player_spawner.gd | Spawn/despawn Player per peer | 02-player-spawning |
+# | network_player_spawner.gd | Spawn/despawn Player per peer | Done on 02-player-spawning |
 # | README.md | This map | always |
 #
 # Gameplay networking (RPCs / synchronizers) stays next to the system it belongs to:
