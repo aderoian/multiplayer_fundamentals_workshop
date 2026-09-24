@@ -70,6 +70,9 @@ func _apply_setup() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Top-down: never rotate the body to face movement.
+	rotation = 0.0
+
 	if _respawn_timer >= 0.0:
 		_respawn_timer -= delta
 		if _respawn_timer <= 0.0:
@@ -102,9 +105,6 @@ func _physics_process(delta: float) -> void:
 	velocity = dir * speed
 	move_and_slide()
 
-	if dir.length_squared() > 0.0:
-		rotation = dir.angle()
-
 	# WORKSHOP TODO:
 	# Position is PLAYER STATE owned by the input authority.
 	# After checkpoint 03 only the authority moves; without sync, remotes stand still.
@@ -115,7 +115,7 @@ func _physics_process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not _should_process_input():
 		return
-	if not health.is_alive:
+	if not _can_use_items():
 		return
 	if event.is_action_pressed("use_slot_1"):
 		_try_use_item(0)
@@ -123,6 +123,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_use_item(1)
 	elif event.is_action_pressed("use_slot_3"):
 		_try_use_item(2)
+
+
+func _can_use_items() -> bool:
+	## Dead or waiting to respawn cannot use inventory. Cleared on respawn.
+	if _respawn_timer >= 0.0:
+		return false
+	if health == null or not health.is_alive:
+		return false
+	return true
 
 
 func _should_process_input() -> bool:
@@ -134,6 +143,9 @@ func _should_process_input() -> bool:
 
 
 func _try_use_item(slot_index: int) -> void:
+	# Offline applies immediately. Multiplayer will request server validation (07).
+	if not _can_use_items():
+		return
 	inventory.use_slot(slot_index, health)
 
 
@@ -196,16 +208,49 @@ func _on_died() -> void:
 
 
 func _on_respawned() -> void:
+	_respawn_timer = -1.0
 	modulate = Color(1, 1, 1, 1)
+	rotation = 0.0
 	_update_visuals()
 
 
 func _do_respawn() -> void:
+	_apply_respawn_state(_pick_respawn_position())
+
+
+func _pick_respawn_position() -> Vector2:
 	var points := get_tree().get_nodes_in_group("respawn_points")
 	if points.size() > 0:
 		var idx: int = abs(peer_id) % points.size()
-		global_position = (points[idx] as Node2D).global_position
+		return (points[idx] as Node2D).global_position
+	return global_position
+
+
+func _apply_respawn_state(p_pos: Vector2) -> void:
+	## Clears death gates so movement, pickup, and item use work again.
+	_respawn_timer = -1.0
+	global_position = p_pos
+	rotation = 0.0
+	modulate = Color(1, 1, 1, 1)
 	health.mark_respawned()
+	_update_visuals()
+
+
+func reset_for_new_match(as_it: bool, spawn_pos: Vector2) -> void:
+	## In-place match restart — keep the node, reset gameplay state.
+	_respawn_timer = -1.0
+	velocity = Vector2.ZERO
+	tag_comp.begin_cooldown_sec(2.0)
+	global_position = spawn_pos
+	rotation = 0.0
+	modulate = Color(1, 1, 1, 1)
+	health.reset_full()
+	inventory.clear_all()
+	tag_comp.set_it(as_it)
+	_update_visuals()
+	health.health_changed.emit(health.health, health.max_health)
+	inventory.inventory_changed.emit(inventory.slots.duplicate())
+	inventory.speed_boost_changed.emit(false, 0.0)
 
 
 func _on_tag_changed(_is_it: bool) -> void:
