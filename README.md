@@ -4,7 +4,7 @@ Convert a working **offline** top-down tag game into a small multiplayer arena u
 
 **Required Godot version:** 4.3+ (validated with **4.3.stable**)
 
-**You are here:** `workshop/02-player-spawning` — peers spawn Player instances; input authority is next.
+**You are here:** `workshop/03-player-authority` — only authority reads input; remotes idle until sync.
 
 **Solution branch:** `workshop/10-complete`
 
@@ -85,23 +85,19 @@ git checkout checkpoint-05
 
 ---
 
-## Workshop TODO locations (this branch: 02-player-spawning)
+## Workshop TODO locations (this branch: 03-player-authority)
 
-Search the repo for `WORKSHOP TODO`.
-
-| Topic | File | Status on 02 |
+| Topic | File | Status on 03 |
 |-------|------|----------------|
-| Host ENet server | `network/network_manager.gd` → `host_game` | Done |
-| Join ENet client | `network/network_manager.gd` → `join_game` | Done |
-| Spawn per peer | `network/network_player_spawner.gd` + `MultiplayerSpawner` | Done |
-| Input still wrong for remotes | `network/network_player_spawner.gd`, `scripts/player/player.gd` | TODO (03) |
-| Match timer / score ownership | `scripts/game/match_manager.gd` | TODO |
-| Health authority | `scripts/player/health.gd` | TODO |
-| Inventory / pickup authority | `scripts/player/inventory.gd`, `scripts/world/pickup.gd` | TODO |
-| Tag request RPC | `scripts/player/tag_component.gd`, `scripts/player/player.gd` | TODO |
-| Input / camera authority | `scripts/player/player.gd` | TODO |
-| Movement sync | `scripts/player/player.gd` | TODO |
-| Death/respawn authority | `scripts/player/player.gd` | TODO |
+| Host / Join / Spawn | network/* | Done |
+| Input / camera authority | `scripts/player/player.gd` | Done |
+| Movement sync | `scripts/player/player.gd` | TODO (04) |
+| Tag request RPC | tag / player | TODO |
+| Health authority | health / player | TODO |
+| Inventory / pickup | inventory / pickup | TODO |
+| Match timer / scores | match_manager | TODO |
+| Death/respawn authority | player | TODO |
+| Late join snapshot | spawner / match | TODO (09) |
 
 ---
 

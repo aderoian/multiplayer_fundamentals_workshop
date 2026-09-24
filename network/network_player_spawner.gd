@@ -95,10 +95,8 @@ func _spawn_player_from_data(data: Variant) -> Node:
 	var player: CharacterBody2D = PLAYER_SCENE.instantiate() as CharacterBody2D
 	player.name = "Player_%d" % peer_id
 	player.set_multiplayer_authority(peer_id)
-	# WORKSHOP TODO (checkpoint 03):
-	# Authority is set above, but input may still use is_local_controlled.
-	# Change setup_player / _should_process_input to honor is_multiplayer_authority().
-	# Until then, every machine may still process WASD for every instance — intentional gap.
+	# Authority is set; player.gd uses is_multiplayer_authority() for input/camera (03).
+	# WORKSHOP TODO (checkpoint 04): remotes still will not see movement until position syncs.
 	var is_local: bool = (multiplayer.multiplayer_peer == null) or (peer_id == multiplayer.get_unique_id())
 	player.call("setup_player", peer_id, display_name, is_local)
 	player.global_position = _spawn_position_for(peer_id)

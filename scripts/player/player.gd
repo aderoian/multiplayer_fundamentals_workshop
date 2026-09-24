@@ -50,7 +50,10 @@ func _apply_setup() -> void:
 		return
 	tag_comp.peer_id = peer_id
 	name_label.text = display_name
-	camera.enabled = is_local_controlled
+	# The Player node exists on every machine; only the authority reads WASD / owns the camera.
+	if multiplayer.multiplayer_peer != null:
+		set_multiplayer_authority(peer_id)
+	camera.enabled = _should_process_input()
 	Match.ensure_player_score(peer_id)
 	if peer_id == Match.current_it_player:
 		tag_comp.set_it(true)
@@ -59,15 +62,11 @@ func _apply_setup() -> void:
 	_update_visuals()
 	_setup_applied = true
 
-	# WORKSHOP TODO:
-	# Input & camera are about AUTHORITY, not "who exists".
-	# 1) Who owns input? The peer that owns this player (peer_id).
-	# 2) Who may change position via keyboard? Only is_multiplayer_authority().
-	# 3) Who needs position? Everyone (movement sync in checkpoint 04).
-	# 4) Late join? Spawner/snapshot must create this node with correct authority.
-	# Concept: set_multiplayer_authority(peer_id); only authority reads WASD (03).
-	# Change: replace is_local_controlled checks with is_multiplayer_authority() once networked.
-	# Until checkpoint 03, every machine may still read local input — intentional leftover.
+	# Ownership (input/camera):
+	# 1) Who owns this? The peer with peer_id (set_multiplayer_authority).
+	# 2) Who may change? Only is_multiplayer_authority() reads keyboard.
+	# 3) Who needs it? Position must reach everyone (movement sync — checkpoint 04).
+	# 4) Late join? Spawner sets authority when the instance is created.
 
 
 func _physics_process(delta: float) -> void:
@@ -127,10 +126,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _should_process_input() -> bool:
+	# Offline (no peer): Godot treats us as server id 1 — use local control flag.
 	if multiplayer.multiplayer_peer == null:
 		return is_local_controlled
-	# WORKSHOP TODO (checkpoint 03): return is_multiplayer_authority()
-	return is_local_controlled
+	# Online: only the authority machine reads keyboard for this Player instance.
+	return is_multiplayer_authority()
 
 
 func _try_use_item(slot_index: int) -> void:
