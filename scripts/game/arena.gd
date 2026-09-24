@@ -34,16 +34,36 @@ func _spawn_default_pickups() -> void:
 
 
 func restart_from_ui() -> void:
-	# Clear players and pickups, re-seed offline session.
-	network_spawner.clear_players()
-	for c in pickups_root.get_children():
-		c.queue_free()
-	await get_tree().process_frame
-	_spawn_default_pickups()
-	if multiplayer.multiplayer_peer == null:
+	## Offline: reset existing player in place (do not rely on free+respawn only).
+	## Online host-only restart is filled in once MultiplayerSpawner exists (02+).
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
+		return
+	_reset_pickups_local()
+	var players := get_tree().get_nodes_in_group("players")
+	if players.is_empty() and multiplayer.multiplayer_peer == null:
 		var player: CharacterBody2D = network_spawner.spawn_local_offline_player()
 		Match.restart_match(1)
 		if player:
 			(player as Node).get_node("Tag").set_it(true)
-	else:
-		Match.restart_match(1)
+		return
+	for n in players:
+		if n.has_method("reset_for_new_match"):
+			var spawn: Vector2 = _spawn_pos_for(int(n.get("peer_id")))
+			n.call("reset_for_new_match", true, spawn)
+	Match.restart_match(1)
+
+
+func _reset_pickups_local() -> void:
+	var old: Array = pickups_root.get_children()
+	for c in old:
+		pickups_root.remove_child(c)
+		c.free()
+	_spawn_default_pickups()
+
+
+func _spawn_pos_for(peer_id: int) -> Vector2:
+	var markers: Array[Marker2D] = spawn_manager.player_spawn_markers
+	if markers.is_empty():
+		return Vector2(200, 200)
+	var idx: int = abs(peer_id - 1) % markers.size()
+	return markers[idx].global_position
