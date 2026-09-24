@@ -105,11 +105,10 @@ func _physics_process(delta: float) -> void:
 	if dir.length_squared() > 0.0:
 		rotation = dir.angle()
 
-	# WORKSHOP TODO:
-	# Position is PLAYER STATE owned by the input authority.
-	# After checkpoint 03 only the authority moves; without sync, remotes stand still.
-	# Concept: MultiplayerSynchronizer or unreliable position RPC (checkpoint 04).
-	# Note: remotes will look slightly late — prediction is out of scope for this workshop.
+	# Position sync: MultiplayerSynchronizer on this scene replicates position/rotation
+	# from the authority. Remote movement looks slightly late — prediction / reconciliation
+	# are out of scope for this workshop (future topic).
+	# Offline (no multiplayer_peer) still uses this same local movement path.
 
 
 func _unhandled_input(event: InputEvent) -> void:

@@ -4,7 +4,7 @@ Convert a working **offline** top-down tag game into a small multiplayer arena u
 
 **Required Godot version:** 4.3+ (validated with **4.3.stable**)
 
-**You are here:** `workshop/03-player-authority` — only authority reads input; remotes idle until sync.
+**You are here:** `workshop/04-movement` — position syncs; tag/health/inventory still local/unsafe online.
 
 **Solution branch:** `workshop/10-complete`
 
@@ -85,19 +85,19 @@ git checkout checkpoint-05
 
 ---
 
-## Workshop TODO locations (this branch: 03-player-authority)
+## Workshop TODO locations (this branch: 04-movement)
 
-| Topic | File | Status on 03 |
+| Topic | File | Status on 04 |
 |-------|------|----------------|
-| Host / Join / Spawn | network/* | Done |
-| Input / camera authority | `scripts/player/player.gd` | Done |
-| Movement sync | `scripts/player/player.gd` | TODO (04) |
-| Tag request RPC | tag / player | TODO |
-| Health authority | health / player | TODO |
-| Inventory / pickup | inventory / pickup | TODO |
-| Match timer / scores | match_manager | TODO |
-| Death/respawn authority | player | TODO |
+| Connect / spawn / authority / movement | network + player | Done |
+| Tag request RPC | `scripts/player/tag_component.gd`, `player.gd` | TODO (05) |
+| Health authority | `health.gd`, `player.gd` | TODO (06) |
+| Inventory / pickup | `inventory.gd`, `pickup.gd` | TODO (07) |
+| Match timer / scores | `match_manager.gd` | TODO (08) |
+| Death/respawn authority | `player.gd` | TODO (06) |
 | Late join snapshot | spawner / match | TODO (09) |
+
+Remote movement looks slightly late; **no client prediction** (out of scope).
 
 ---
 
