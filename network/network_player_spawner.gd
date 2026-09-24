@@ -1,5 +1,5 @@
-extends Node
-## NetworkPlayerSpawner — one Player instance per connected peer (checkpoint 02).
+﻿extends Node
+## NetworkPlayerSpawner ΓÇö one Player instance per connected peer (checkpoint 02).
 ## Prefer MultiplayerSpawner so spawn/despawn replicate automatically.
 
 const PLAYER_SCENE: PackedScene = preload("res://scenes/player.tscn")
@@ -52,16 +52,32 @@ func spawn_local_offline_player() -> CharacterBody2D:
 func _on_peer_connected(id: int) -> void:
 	if not multiplayer.is_server():
 		return
-	# Name may arrive via RPC shortly; spawn with placeholder then rename if needed.
-	var n: String = str(Network.peer_names.get(id, "Player_%d" % id))
-	_spawn_for_peer(id, n)
+	# Do NOT spawn immediately ΓÇö the client may not have loaded the arena yet.
+	# Spawn when they register a name from begin_online_session (arena _ready).
+	# Late-join snapshot is sent after that spawn (see _rpc_register_name).
+	print("[Spawner] peer_connected %d ΓÇö waiting for name/arena ready" % id)
 
 
 func _on_peer_disconnected(id: int) -> void:
 	if multiplayer.is_server():
+		var was_it: bool = (Match.current_it_player == id)
 		_despawn_for_peer(id)
+		Match.remove_player_score(id)
+		if was_it:
+			_reassign_it_after_disconnect()
 	players.erase(id)
-	Match.remove_player_score(id)
+
+
+func _reassign_it_after_disconnect() -> void:
+	## If the player who is It leaves, server picks another remaining peer and syncs.
+	var next_it: int = -1
+	for pid in players.keys():
+		next_it = int(pid)
+		break
+	if next_it < 0:
+		next_it = 1
+	Match.reassign_it(next_it)
+	print("[Spawner] It reassigned to peer %d after disconnect" % next_it)
 
 
 func _spawn_for_peer(peer_id: int, display_name: String) -> void:
@@ -88,9 +104,11 @@ func _despawn_for_peer(peer_id: int) -> void:
 
 
 func _spawn_player_from_data(data: Variant) -> Node:
-	## MultiplayerSpawner.spawn_function — runs on every peer when server spawns.
+	## MultiplayerSpawner.spawn_function ΓÇö runs on every peer when server spawns.
 	var dict: Dictionary = data as Dictionary
 	var peer_id: int = int(dict.get("peer_id", 1))
+	if players.has(peer_id) and is_instance_valid(players[peer_id]):
+		return players[peer_id]
 	var display_name: String = str(dict.get("player_name", "Player"))
 	var player: CharacterBody2D = PLAYER_SCENE.instantiate() as CharacterBody2D
 	player.name = "Player_%d" % peer_id
@@ -110,7 +128,7 @@ func _rpc_register_name(p_name: String) -> void:
 		return
 	var sender: int = multiplayer.get_remote_sender_id()
 	Network.peer_names[sender] = p_name
-	# If already spawned with placeholder, update label.
+	# Client arena is ready (they called begin_online_session). Safe to spawn now.
 	if players.has(sender):
 		var p: Node = players[sender]
 		if p.has_method("setup_player"):
@@ -118,6 +136,53 @@ func _rpc_register_name(p_name: String) -> void:
 			p.call("setup_player", sender, p_name, is_local)
 	else:
 		_spawn_for_peer(sender, p_name)
+	# Resync everyone ΓÇö MultiplayerSpawner alone can miss peers whose arena
+	# was not ready at an earlier spawn, and late joiners need existing bodies.
+	_resync_all_player_nodes()
+	get_tree().create_timer(0.25).timeout.connect(func() -> void:
+		if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+			Match.build_and_send_late_join(sender)
+	)
+
+
+func _resync_all_player_nodes() -> void:
+	if not multiplayer.is_server():
+		return
+	for pid in multiplayer.get_peers():
+		_sync_existing_players_to(int(pid))
+
+
+func _sync_existing_players_to(peer_id: int) -> void:
+	## Make sure a late joiner has every already-spawned Player node.
+	for pid in players.keys():
+		var node: Node = players[pid]
+		if not is_instance_valid(node):
+			continue
+		var data := {
+			"peer_id": int(pid),
+			"player_name": str(Network.peer_names.get(pid, "Player_%d" % pid)),
+			"pos": (node as Node2D).global_position,
+		}
+		_rpc_ensure_player.rpc_id(peer_id, data)
+
+
+@rpc("authority", "reliable")
+func _rpc_ensure_player(data: Dictionary) -> void:
+	## Client receives existing players the MultiplayerSpawner may have missed.
+	var peer_id: int = int(data.get("peer_id", 0))
+	if peer_id == 0:
+		return
+	if players.has(peer_id):
+		var existing: Node = players[peer_id]
+		if is_instance_valid(existing) and data.has("pos"):
+			(existing as Node2D).global_position = data["pos"]
+		return
+	var player: Node = _spawn_player_from_data(data)
+	if players_root and player.get_parent() == null:
+		players_root.add_child(player, true)
+	if data.has("pos"):
+		(player as Node2D).global_position = data["pos"]
+	print("[Spawner] ensured Player_%d on peer %d" % [peer_id, multiplayer.get_unique_id()])
 
 
 func get_player(peer_id: int) -> CharacterBody2D:
