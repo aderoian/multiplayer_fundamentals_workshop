@@ -4,7 +4,7 @@ Convert a working **offline** top-down tag game into a small multiplayer arena u
 
 **Required Godot version:** 4.3+ (validated with **4.3.stable**)
 
-**You are here:** `workshop/00-starter` — full offline game, networking intentionally incomplete.
+**You are here:** `workshop/01-connect` — ENet host/join works; players not spawned yet.
 
 **Solution branch:** `workshop/10-complete`
 
@@ -26,7 +26,7 @@ Convert a working **offline** top-down tag game into a small multiplayer arena u
 4. Controls: **WASD** move, **Shift** sprint, **1 / 2 / 3** use inventory slots
 5. Walk over colored pickups to collect; while **IT**, touch another player to tag (offline with one player: you start as It)
 
-Host / Join buttons exist but show *"Networking is a workshop exercise"* on this branch.
+Host / Join create a real ENet peer and show peer id / status. Player spawning is still a later TODO.
 
 ---
 
@@ -85,15 +85,15 @@ git checkout checkpoint-05
 
 ---
 
-## Workshop TODO locations (this branch: 00-starter)
+## Workshop TODO locations (this branch: 01-connect)
 
 Search the repo for `WORKSHOP TODO` — every marker explains what is wrong, the concept, why it matters, and what to change.
 
-| Topic | File | Status on 00 |
+| Topic | File | Status on 01 |
 |-------|------|----------------|
-| Host ENet server | `network/network_manager.gd` → `host_game` | TODO |
-| Join ENet client | `network/network_manager.gd` → `join_game` | TODO |
-| Spawn per peer | `network/network_player_spawner.gd` | TODO |
+| Host ENet server | `network/network_manager.gd` → `host_game` | Done |
+| Join ENet client | `network/network_manager.gd` → `join_game` | Done |
+| Spawn per peer | `network/network_manager.gd` (`peer_connected`), `network/network_player_spawner.gd` | TODO |
 | Match timer / score ownership | `scripts/game/match_manager.gd` | TODO |
 | Health authority | `scripts/player/health.gd` | TODO |
 | Inventory / pickup authority | `scripts/player/inventory.gd`, `scripts/world/pickup.gd` | TODO |

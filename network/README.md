@@ -5,7 +5,7 @@
 #
 # | File | Role | Filled in |
 # |------|------|-----------|
-# | network_manager.gd | ENet host/join, peer signals, status | 01-connect (stubs in 00) |
+# | network_manager.gd | ENet host/join, peer signals, status | Done on 01-connect |
 # | network_player_spawner.gd | Spawn/despawn Player per peer | 02-player-spawning |
 # | README.md | This map | always |
 #
